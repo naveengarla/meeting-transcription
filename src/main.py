@@ -121,9 +121,100 @@ class MainWindow(QMainWindow):
         
         # Load devices
         self.load_audio_devices()
+    
+    def create_menu_bar(self):
+        """Create menu bar with all application features"""
+        menubar = self.menuBar()
         
+        # File Menu
+        file_menu = menubar.addMenu("&File")
+        
+        # New Recording
+        new_action = file_menu.addAction("🎙 New Recording")
+        new_action.setShortcut("Ctrl+N")
+        new_action.triggered.connect(self.start_recording)
+        
+        # Recording Manager
+        recordings_action = file_menu.addAction("📁 Recording Manager")
+        recordings_action.setShortcut("Ctrl+R")
+        recordings_action.triggered.connect(self.view_recordings)
+        
+        file_menu.addSeparator()
+        
+        # Export
+        export_txt_action = file_menu.addAction("💾 Export as TXT")
+        export_txt_action.setShortcut("Ctrl+S")
+        export_txt_action.triggered.connect(lambda: self.save_transcript('txt'))
+        
+        export_md_action = file_menu.addAction("📄 Export as Markdown")
+        export_md_action.setShortcut("Ctrl+Shift+S")
+        export_md_action.triggered.connect(lambda: self.save_transcript('markdown'))
+        
+        file_menu.addSeparator()
+        
+        # Exit
+        exit_action = file_menu.addAction("❌ Exit")
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(self.close)
+        
+        # Tools Menu
+        tools_menu = menubar.addMenu("&Tools")
+        
+        # Settings Dialog
+        settings_action = tools_menu.addAction("⚙️ Settings")
+        settings_action.setShortcut("Ctrl+,")
+        settings_action.triggered.connect(self.open_settings)
+        
+        # Audio Setup Helper
+        audio_setup_action = tools_menu.addAction("🎵 Audio Setup Wizard")
+        audio_setup_action.triggered.connect(self.open_audio_setup)
+        
+        # Model Downloader
+        models_action = tools_menu.addAction("📥 Download Models")
+        models_action.triggered.connect(self.open_model_downloader)
+        
+        tools_menu.addSeparator()
+        
+        # System Check
+        system_check_action = tools_menu.addAction("🔍 System Check")
+        system_check_action.triggered.connect(self.run_system_check)
+        
+        # Diagnostic Report
+        diagnostic_action = tools_menu.addAction("📊 Generate Diagnostic Report")
+        diagnostic_action.triggered.connect(self.generate_diagnostic_report)
+        
+        # Performance Analysis
+        performance_action = tools_menu.addAction("📈 Analyze Performance")
+        performance_action.triggered.connect(self.analyze_performance)
+        
+        # Help Menu
+        help_menu = menubar.addMenu("&Help")
+        
+        # Quick Start
+        quickstart_action = help_menu.addAction("🚀 Quick Start Guide")
+        quickstart_action.setShortcut("F1")
+        quickstart_action.triggered.connect(self.show_quickstart)
+        
+        # Documentation
+        docs_action = help_menu.addAction("📚 Documentation")
+        docs_action.triggered.connect(self.show_documentation)
+        
+        # Stereo Mix Guide
+        stereo_mix_action = help_menu.addAction("🔊 Stereo Mix Setup Guide")
+        stereo_mix_action.triggered.connect(self.show_stereo_mix_guide)
+        
+        help_menu.addSeparator()
+        
+        # About
+        about_action = help_menu.addAction("ℹ️ About")
+        about_action.triggered.connect(self.show_about)
+        
+    
     def init_ui(self):
         """Initialize user interface"""
+        # Create menu bar
+        self.create_menu_bar()
+        
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
@@ -1087,6 +1178,335 @@ class MainWindow(QMainWindow):
             )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not open Sound Settings:\n{e}")
+    
+    # ========================================
+    # Menu Action Handlers
+    # ========================================
+    
+    def open_settings(self):
+        """Open Settings dialog"""
+        try:
+            import subprocess
+            import sys
+            
+            # Run settings_ui.py as separate process
+            settings_path = Path(__file__).parent.parent / "settings_ui.py"
+            
+            if settings_path.exists():
+                subprocess.Popen([sys.executable, str(settings_path)])
+                self.status_bar.showMessage("Settings dialog opened", 3000)
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Settings Not Found",
+                    f"Settings UI not found at: {settings_path}\n\n"
+                    "You can configure settings by editing the .env file manually."
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to open settings:\n{e}")
+    
+    def open_audio_setup(self):
+        """Run Audio Setup Wizard"""
+        try:
+            import subprocess
+            import sys
+            
+            helper_path = Path(__file__).parent.parent / "audio_setup_helper.py"
+            
+            if helper_path.exists():
+                # Run in new terminal window so user can see interactive prompts
+                subprocess.Popen(['start', 'cmd', '/k', sys.executable, str(helper_path)], shell=True)
+                
+                QMessageBox.information(
+                    self,
+                    "Audio Setup Wizard",
+                    "Audio Setup Wizard has been launched in a new window.\n\n"
+                    "Follow the interactive prompts to:\n"
+                    "• Detect available audio devices\n"
+                    "• Test microphone and Stereo Mix\n"
+                    "• Get setup instructions\n"
+                    "• Generate .env configuration\n\n"
+                    "After completing the wizard, click '🔄 Refresh Devices' to reload."
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Audio Setup Not Found",
+                    f"Audio setup helper not found at: {helper_path}"
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to open audio setup:\n{e}")
+    
+    def open_model_downloader(self):
+        """Run Model Downloader"""
+        try:
+            import subprocess
+            import sys
+            
+            downloader_path = Path(__file__).parent.parent / "download_models.py"
+            
+            if downloader_path.exists():
+                # Run in new terminal window
+                subprocess.Popen(['start', 'cmd', '/k', sys.executable, str(downloader_path)], shell=True)
+                
+                QMessageBox.information(
+                    self,
+                    "Model Downloader",
+                    "Model Downloader has been launched in a new window.\n\n"
+                    "Choose which Whisper models to download:\n"
+                    "• Tiny (75 MB) - Very fast\n"
+                    "• Base (142 MB) - Recommended\n"
+                    "• Small (466 MB) - Better quality\n"
+                    "• Medium (1.5 GB) - Best quality\n\n"
+                    "Models will be cached for future use."
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Model Downloader Not Found",
+                    f"Model downloader not found at: {downloader_path}\n\n"
+                    "Models will auto-download when first needed."
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to open model downloader:\n{e}")
+    
+    def run_system_check(self):
+        """Run System Check"""
+        try:
+            import subprocess
+            import sys
+            
+            check_path = Path(__file__).parent.parent / "check_system.py"
+            
+            if check_path.exists():
+                # Run in new terminal window
+                subprocess.Popen(['start', 'cmd', '/k', sys.executable, str(check_path)], shell=True)
+                
+                QMessageBox.information(
+                    self,
+                    "System Check",
+                    "System Check has been launched in a new window.\n\n"
+                    "This will validate:\n"
+                    "✓ Windows version (Build 17763+)\n"
+                    "✓ Python version (3.10+)\n"
+                    "✓ CPU cores (2+ recommended)\n"
+                    "✓ RAM (4GB+ required)\n"
+                    "✓ Disk space (3GB+ required)\n"
+                    "✓ Audio devices\n"
+                    "✓ Visual C++ Redistributable\n"
+                    "✓ Internet connectivity"
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "System Check Not Found",
+                    f"System check script not found at: {check_path}"
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to run system check:\n{e}")
+    
+    def generate_diagnostic_report(self):
+        """Generate Diagnostic Report"""
+        try:
+            import subprocess
+            import sys
+            
+            diag_path = Path(__file__).parent.parent / "diagnostic_report.py"
+            
+            if diag_path.exists():
+                # Run in new terminal window
+                subprocess.Popen(['start', 'cmd', '/k', sys.executable, str(diag_path)], shell=True)
+                
+                QMessageBox.information(
+                    self,
+                    "Diagnostic Report",
+                    "Diagnostic Report generator has been launched in a new window.\n\n"
+                    "This will collect:\n"
+                    "• System information (OS, CPU, RAM)\n"
+                    "• Hardware specifications\n"
+                    "• Audio devices (input/output)\n"
+                    "• Installed packages\n"
+                    "• Model cache inventory\n"
+                    "• Recent performance logs\n"
+                    "• Configuration settings\n\n"
+                    "Report will be saved to logs/ folder."
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Diagnostic Report Not Found",
+                    f"Diagnostic report script not found at: {diag_path}"
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to generate diagnostic report:\n{e}")
+    
+    def analyze_performance(self):
+        """Analyze Performance Metrics"""
+        try:
+            import subprocess
+            import sys
+            
+            analysis_path = Path(__file__).parent.parent / "analyze_performance.py"
+            
+            if analysis_path.exists():
+                # Run in new terminal window
+                subprocess.Popen(['start', 'cmd', '/k', sys.executable, str(analysis_path)], shell=True)
+                
+                QMessageBox.information(
+                    self,
+                    "Performance Analysis",
+                    "Performance Analyzer has been launched in a new window.\n\n"
+                    "This will show:\n"
+                    "• Transcription speed statistics\n"
+                    "• CPU usage patterns\n"
+                    "• Memory consumption\n"
+                    "• Model performance comparison\n"
+                    "• Recent transcription history\n\n"
+                    "Data from logs/performance_YYYYMM.jsonl"
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Performance Analyzer Not Found",
+                    f"Performance analyzer not found at: {analysis_path}"
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to analyze performance:\n{e}")
+    
+    def show_quickstart(self):
+        """Show Quick Start Guide"""
+        quickstart_path = Path(__file__).parent.parent / "QUICKSTART.md"
+        
+        if quickstart_path.exists():
+            try:
+                import subprocess
+                subprocess.Popen(['notepad.exe', str(quickstart_path)])
+            except:
+                QMessageBox.information(
+                    self,
+                    "Quick Start Guide",
+                    f"Quick Start Guide location:\n{quickstart_path}\n\n"
+                    "Open this file in your preferred text editor."
+                )
+        else:
+            QMessageBox.information(
+                self,
+                "Quick Start",
+                "Quick Start Guide:\n\n"
+                "1. Select audio devices (microphone and/or system audio)\n"
+                "2. Click '🔊 Open Sound Settings' to enable Stereo Mix\n"
+                "3. Click '▶ Start Recording'\n"
+                "4. Conduct your meeting\n"
+                "5. Click '⏹ Stop Recording'\n"
+                "6. Click '📝 Transcribe'\n"
+                "7. Save transcript as TXT or Markdown\n\n"
+                "For system audio recording, Stereo Mix must be enabled!"
+            )
+    
+    def show_documentation(self):
+        """Show Documentation"""
+        docs_dir = Path(__file__).parent.parent / "docs"
+        
+        if docs_dir.exists():
+            try:
+                import subprocess
+                subprocess.Popen(['explorer', str(docs_dir)])
+            except:
+                QMessageBox.information(
+                    self,
+                    "Documentation",
+                    f"Documentation location:\n{docs_dir}\n\n"
+                    "Key files:\n"
+                    "• ARCHITECTURE.md - System design\n"
+                    "• REQUIREMENTS.md - Project requirements\n"
+                    "• LANGUAGE_SUPPORT.md - 99+ languages\n"
+                    "• MEETING_RECORDING_GUIDE.md - Stereo Mix setup\n"
+                    "• concepts/ - Technical tutorials"
+                )
+        else:
+            QMessageBox.information(
+                self,
+                "Documentation",
+                "Documentation:\n\n"
+                "See README.md in the project root for:\n"
+                "• Feature overview\n"
+                "• Installation instructions\n"
+                "• Usage guide\n"
+                "• Troubleshooting\n\n"
+                "Visit GitHub for latest documentation."
+            )
+    
+    def show_stereo_mix_guide(self):
+        """Show Stereo Mix Setup Guide"""
+        QMessageBox.information(
+            self,
+            "Stereo Mix Setup Guide",
+            "<h3>How to Enable Stereo Mix on Windows:</h3>"
+            "<ol>"
+            "<li>Click '<b>🔊 Open Sound Settings</b>' button below</li>"
+            "<li>In the '<b>Recording</b>' tab:</li>"
+            "<li>Right-click in empty area → '<b>Show Disabled Devices</b>'</li>"
+            "<li>Find '<b>Stereo Mix</b>' in the list</li>"
+            "<li>Right-click 'Stereo Mix' → '<b>Enable</b>'</li>"
+            "<li>Set as default device (optional)</li>"
+            "<li>Click '<b>OK</b>'</li>"
+            "<li>In this app: Click '<b>🔄 Refresh Devices</b>'</li>"
+            "</ol>"
+            "<br>"
+            "<p><b>If Stereo Mix is not available:</b></p>"
+            "<ul>"
+            "<li>Update your audio driver</li>"
+            "<li>Use virtual audio cable (VB-Cable, Voicemeeter)</li>"
+            "<li>Run: <code>python audio_setup_helper.py</code> for alternatives</li>"
+            "</ul>"
+            "<br>"
+            "<p><b>Why Stereo Mix?</b></p>"
+            "<p>Stereo Mix captures '<b>what you hear</b>' (system audio).<br>"
+            "This includes meeting participants in Teams, Zoom, etc.</p>"
+        )
+        
+        # Offer to open sound settings
+        reply = QMessageBox.question(
+            self,
+            "Open Sound Settings?",
+            "Would you like to open Windows Sound Settings now?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.open_sound_settings()
+    
+    def show_about(self):
+        """Show About dialog"""
+        QMessageBox.about(
+            self,
+            "About Meeting Transcription",
+            "<h2>Meeting Transcription & MoM Generator</h2>"
+            "<p><b>Version:</b> 1.0.0</p>"
+            "<p><b>Build Date:</b> December 3, 2025</p>"
+            "<br>"
+            "<p>A Windows desktop application for real-time meeting transcription "
+            "and Minutes of Meeting (MoM) generation.</p>"
+            "<br>"
+            "<p><b>Features:</b></p>"
+            "<ul>"
+            "<li>Dual audio capture (microphone + system audio)</li>"
+            "<li>Multi-engine transcription (faster-whisper, Azure, Chrome)</li>"
+            "<li>High performance (6-7x real-time speed)</li>"
+            "<li>99+ languages supported</li>"
+            "<li>Offline operation</li>"
+            "<li>Recording management with built-in player</li>"
+            "<li>Export to TXT and Markdown</li>"
+            "</ul>"
+            "<br>"
+            "<p><b>Technologies:</b></p>"
+            "<p>PyQt6, faster-whisper, CTranslate2, sounddevice, pygame</p>"
+            "<br>"
+            "<p><b>Repository:</b> <a href='https://github.com/naveengarla/meeting-transcription'>"
+            "github.com/naveengarla/meeting-transcription</a></p>"
+            "<br>"
+            "<p>Made with ❤️ for better meeting productivity</p>"
+        )
 
 
 def main():
