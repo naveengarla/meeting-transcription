@@ -35,9 +35,8 @@ ENV/
 # Environment variables
 .env
 
-# Recordings & Transcripts (keep structure, exclude content)
-recordings/*.wav
-recordings/*.mp3
+# Recordings & Transcripts (keep private)
+recordings/
 transcripts/*.txt
 transcripts/*.md
 !README.md
