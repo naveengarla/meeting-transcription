@@ -17,7 +17,7 @@ This installs everything automatically.
 ### 3. Run the App
 ```powershell
 .\venv\Scripts\Activate.ps1
-python main.py
+python run.py
 ```
 
 ## Quick Usage

@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Project paths
-PROJECT_ROOT = Path(__file__).parent
+PROJECT_ROOT = Path(__file__).parent.parent  # Go up to project root
 RECORDINGS_DIR = PROJECT_ROOT / "recordings"
 TRANSCRIPTS_DIR = PROJECT_ROOT / "transcripts"
 MODELS_DIR = PROJECT_ROOT / "models"

@@ -90,7 +90,7 @@ A Windows desktop application for real-time meeting transcription and Minutes of
 
 5. **Run the application**
    ```powershell
-   python main.py
+   python run.py
    ```
 
 ## 📖 Usage Guide

@@ -50,5 +50,5 @@ if (-not (Test-Path ".env")) {
 Write-Host "`nSetup complete!" -ForegroundColor Green
 Write-Host "`nTo run the application:" -ForegroundColor Cyan
 Write-Host "  1. Activate the virtual environment: .\venv\Scripts\Activate.ps1" -ForegroundColor White
-Write-Host "  2. Run the app: python main.py" -ForegroundColor White
+Write-Host "  2. Run the app: python run.py" -ForegroundColor White
 Write-Host "`nNote: For cloud transcription, update .env with Azure credentials." -ForegroundColor Yellow
