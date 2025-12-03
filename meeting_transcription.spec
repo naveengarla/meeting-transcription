@@ -20,8 +20,9 @@ src_path = project_root / 'src'
 
 # Data files to include
 datas = [
-    # Models directory (if models are pre-downloaded)
-    ('models', 'models'),
+    # Models directory - EXCLUDED to reduce size (models download on first run)
+    # Uncomment the line below to bundle models (increases size by ~2GB):
+    # ('models', 'models'),
     
     # Documentation
     ('README.md', '.'),
