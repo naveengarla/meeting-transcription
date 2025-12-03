@@ -9,6 +9,8 @@ import numpy as np
 import wave
 import tempfile
 import json
+import time
+import psutil
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Callable
@@ -409,47 +411,75 @@ class ChromeSpeechEngine(TranscriptionEngine):
 
 
 class WhisperEngine(TranscriptionEngine):
-    """OpenAI Whisper local transcription engine"""
+    """faster-whisper transcription engine with CTranslate2 optimization"""
     
-    def __init__(self, model_size: str = "base", language: str = "auto", task: str = "transcribe"):
+    def __init__(self, model_size: str = "base", language: str = "auto", task: str = "transcribe", num_workers: int = 8):
         self.model_size = model_size
         self.language = language if language != "auto" else None
         self.task = task  # 'transcribe' or 'translate' (to English)
+        self.num_workers = num_workers  # Number of CPU cores to use
         self.model = None
         
     @property
     def name(self) -> str:
-        return f"Whisper ({self.model_size})"
+        return f"Whisper ({self.model_size}, {self.num_workers} cores)"
     
     def is_available(self) -> bool:
-        """Check if Whisper is available"""
+        """Check if faster-whisper is available"""
         try:
-            import whisper
+            import faster_whisper
             return True
         except ImportError:
             return False
     
     def load_model(self):
-        """Load Whisper model (lazy loading)"""
+        """Load faster-whisper model (lazy loading)"""
         if self.model is None:
             try:
-                import whisper
-                print(f"Loading Whisper model '{self.model_size}'...")
-                self.model = whisper.load_model(self.model_size, download_root=str(config.MODELS_DIR))
-                print(f"✓ Whisper model loaded")
+                from faster_whisper import WhisperModel
+                print(f"Loading faster-whisper model '{self.model_size}' ({self.num_workers} CPU cores)...")
+                
+                # Use CPU with multi-threading
+                # compute_type="int8" is faster and uses less memory than float32
+                # num_workers controls parallel processing (8 cores for your i7-1270P)
+                self.model = WhisperModel(
+                    self.model_size,
+                    device="cpu",
+                    compute_type="int8",
+                    download_root=str(config.MODELS_DIR),
+                    cpu_threads=self.num_workers,
+                    num_workers=1  # Number of parallel batches, keep 1 for sequential processing
+                )
+                print(f"✓ faster-whisper model loaded with {self.num_workers}-core acceleration")
             except Exception as e:
-                print(f"Error loading Whisper model: {e}")
+                print(f"Error loading faster-whisper model: {e}")
                 raise
     
     def transcribe(self, audio_data: np.ndarray, sample_rate: int) -> List[TranscriptSegment]:
-        """Transcribe audio using Whisper"""
+        """Transcribe audio using faster-whisper"""
         if not self.is_available():
-            raise RuntimeError("Whisper is not available. Install with: pip install openai-whisper")
+            raise RuntimeError("faster-whisper is not available. Install with: pip install faster-whisper")
         
         self.load_model()
         
+        # Performance tracking
+        perf_metrics = {
+            'engine': 'faster-whisper',
+            'model': self.model_size,
+            'num_workers': self.num_workers,
+            'language': self.language or 'auto',
+            'task': self.task,
+            'audio_duration_sec': len(audio_data) / sample_rate,
+            'timestamp': datetime.now().isoformat(),
+        }
+        
         try:
-            # Whisper expects float32 normalized to [-1, 1]
+            # Track CPU and memory before
+            process = psutil.Process()
+            cpu_percent_start = process.cpu_percent()
+            mem_start_mb = process.memory_info().rss / 1024 / 1024
+            
+            # faster-whisper expects float32 normalized to [-1, 1]
             audio_float = audio_data.astype(np.float32) / 32768.0
             
             # Flatten if stereo
@@ -458,13 +488,20 @@ class WhisperEngine(TranscriptionEngine):
             
             # Transcribe
             language_str = self.language if self.language else "auto-detect"
-            print(f"🎤 Transcribing with Whisper (language: {language_str}, task: {self.task})...")
-            print(f"   WhisperEngine.language = {self.language}")
+            print(f"🚀 Transcribing with faster-whisper (language: {language_str}, task: {self.task}, cores: {self.num_workers})...")
             
             # Build transcription parameters
             transcribe_params = {
-                'verbose': False,
-                'task': self.task
+                'task': self.task,
+                'beam_size': 5,  # Balance between speed and accuracy
+                'vad_filter': True,  # Voice activity detection to skip silence
+                'vad_parameters': {
+                    'threshold': 0.5,
+                    'min_speech_duration_ms': 250,
+                    'max_speech_duration_s': float('inf'),
+                    'min_silence_duration_ms': 2000,
+                    'speech_pad_ms': 400,
+                }
             }
             
             # Add language if specified (not auto-detect)
@@ -472,30 +509,70 @@ class WhisperEngine(TranscriptionEngine):
                 transcribe_params['language'] = self.language
                 print(f"   Using language parameter: {self.language}")
             
-            result = self.model.transcribe(audio_float, **transcribe_params)
+            # Start timer
+            start_time = time.time()
+            
+            # Transcribe with faster-whisper (returns generator)
+            segments_generator, info = self.model.transcribe(audio_float, **transcribe_params)
             
             # Log detected language
-            detected_lang = result.get('language', 'unknown')
+            detected_lang = info.language if hasattr(info, 'language') else 'unknown'
             print(f"✓ Detected/Used language: {detected_lang}")
+            print(f"   Language probability: {info.language_probability:.2%}")
             
             # Convert to TranscriptSegment objects
             segments = []
-            for seg in result.get('segments', []):
+            for seg in segments_generator:
                 segment = TranscriptSegment(
-                    text=seg['text'].strip(),
-                    start_time=seg['start'],
-                    end_time=seg['end'],
+                    text=seg.text.strip(),
+                    start_time=seg.start,
+                    end_time=seg.end,
                     speaker="Unknown",
-                    confidence=seg.get('confidence', 0.0)
+                    confidence=seg.avg_logprob  # Log probability (higher is better, typically -0.5 to 0)
                 )
                 segments.append(segment)
             
-            print(f"✓ Transcription complete: {len(segments)} segments")
+            # End timer
+            elapsed_time = time.time() - start_time
+            
+            # Track CPU and memory after
+            cpu_percent_end = process.cpu_percent()
+            mem_end_mb = process.memory_info().rss / 1024 / 1024
+            
+            # Calculate metrics
+            perf_metrics['transcription_time_sec'] = round(elapsed_time, 2)
+            perf_metrics['segments_count'] = len(segments)
+            perf_metrics['detected_language'] = detected_lang
+            perf_metrics['language_probability'] = round(info.language_probability, 4)
+            perf_metrics['real_time_factor'] = round(elapsed_time / perf_metrics['audio_duration_sec'], 2)
+            perf_metrics['speed_multiplier'] = round(perf_metrics['audio_duration_sec'] / elapsed_time, 2)
+            perf_metrics['cpu_percent_avg'] = round((cpu_percent_start + cpu_percent_end) / 2, 1)
+            perf_metrics['memory_used_mb'] = round(mem_end_mb - mem_start_mb, 1)
+            perf_metrics['memory_peak_mb'] = round(mem_end_mb, 1)
+            
+            # Log performance metrics
+            self._log_performance(perf_metrics)
+            
+            print(f"✓ Transcription complete: {len(segments)} segments in {elapsed_time:.1f}s")
+            print(f"   Speed: {perf_metrics['speed_multiplier']}x real-time ({perf_metrics['audio_duration_sec']:.1f}s audio in {elapsed_time:.1f}s)")
             return segments
             
         except Exception as e:
-            print(f"Error during Whisper transcription: {e}")
+            perf_metrics['error'] = str(e)
+            self._log_performance(perf_metrics)
+            print(f"Error during faster-whisper transcription: {e}")
             raise
+    
+    def _log_performance(self, metrics: dict):
+        """Log performance metrics to file"""
+        try:
+            log_file = config.LOGS_DIR / f"performance_{datetime.now().strftime('%Y%m')}.jsonl"
+            
+            with open(log_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(metrics) + '\n')
+                
+        except Exception as e:
+            print(f"Warning: Could not log performance metrics: {e}")
 
 
 class AzureSpeechEngine(TranscriptionEngine):
@@ -594,11 +671,13 @@ class TranscriptionManager:
         if chrome_engine.is_available():
             self.engines['chrome'] = chrome_engine
         
-        # Whisper
+        # faster-whisper with multi-core acceleration
+        # Use 8 cores (out of 12) for balance between speed and system responsiveness
         whisper_engine = WhisperEngine(
             model_size=config.WHISPER_MODEL,
             language=config.WHISPER_LANGUAGE,
-            task=config.WHISPER_TASK
+            task=config.WHISPER_TASK,
+            num_workers=8  # Use 8 of 12 cores for optimal performance
         )
         if whisper_engine.is_available():
             self.engines['whisper'] = whisper_engine

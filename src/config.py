@@ -13,11 +13,13 @@ PROJECT_ROOT = Path(__file__).parent.parent  # Go up to project root
 RECORDINGS_DIR = PROJECT_ROOT / "recordings"
 TRANSCRIPTS_DIR = PROJECT_ROOT / "transcripts"
 MODELS_DIR = PROJECT_ROOT / "models"
+LOGS_DIR = PROJECT_ROOT / "logs"
 
 # Create directories if they don't exist
 RECORDINGS_DIR.mkdir(exist_ok=True)
 TRANSCRIPTS_DIR.mkdir(exist_ok=True)
 MODELS_DIR.mkdir(exist_ok=True)
+LOGS_DIR.mkdir(exist_ok=True)
 
 # Audio settings
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
