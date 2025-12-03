@@ -363,7 +363,15 @@ speech2text/
 │   ├── ARCHITECTURE.md              # System design
 │   ├── LANGUAGE_SUPPORT.md          # 99+ supported languages
 │   ├── MEETING_RECORDING_GUIDE.md   # Stereo Mix setup guide
-│   └── REQUIREMENTS.md              # Project requirements
+│   ├── REQUIREMENTS.md              # Project requirements
+│   ├── ROADMAP.md                   # Feature roadmap
+│   └── concepts/                    # Technical tutorials (24,000+ words)
+│       ├── INDEX.md                 # Learning roadmap
+│       ├── speech.md                # Digital speech processing
+│       ├── segments.md              # Segmentation & alignment
+│       ├── transcription.md         # ASR theory & Whisper
+│       ├── models.md                # Neural networks & optimization
+│       └── multithreading.md        # Python concurrency
 │
 ├── logs/
 │   └── performance_YYYYMM.jsonl    # Auto-generated performance metrics
@@ -533,6 +541,68 @@ Shows detailed metrics, statistics, and recent transcription history from `logs/
 ## 📄 License
 
 MIT License - Feel free to use, modify, and distribute.
+
+## 📚 Documentation
+
+### Project Documentation
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design and implementation
+- [REQUIREMENTS.md](docs/REQUIREMENTS.md) - Project requirements and specifications
+- [ROADMAP.md](docs/ROADMAP.md) - Feature roadmap and development plans
+- [LANGUAGE_SUPPORT.md](docs/LANGUAGE_SUPPORT.md) - Complete list of 99+ supported languages
+- [MEETING_RECORDING_GUIDE.md](docs/MEETING_RECORDING_GUIDE.md) - How to set up Stereo Mix
+
+### Technical Tutorials (/docs/concepts)
+
+**Comprehensive technical guides** (24,000+ words) covering the fundamentals needed to build advanced speech recognition applications:
+
+- **[INDEX.md](docs/concepts/INDEX.md)** - Learning roadmap with prerequisites and resources
+- **[speech.md](docs/concepts/speech.md)** - Digital Speech Processing
+  - Sampling theory (Nyquist theorem)
+  - Quantization & bit depth
+  - Frequency domain analysis (FFT, STFT, mel spectrograms)
+  - Audio processing (VAD, normalization, noise reduction)
+  - Audio codecs & psychoacoustics
+  
+- **[segments.md](docs/concepts/segments.md)** - Segmentation & Alignment
+  - Voice Activity Detection (energy-based, WebRTC, Silero VAD)
+  - Alignment algorithms (DTW, HMM, neural CTC)
+  - CTC theory (loss function, decoding)
+  - Attention mechanisms (Bahdanau, Luong, multi-head)
+  - Speaker diarization (embeddings, clustering, pyannote.audio)
+  
+- **[transcription.md](docs/concepts/transcription.md)** - Automatic Speech Recognition
+  - ASR evolution (1952-2022: HMM-GMM → Neural → Transformers)
+  - Classical ASR pipeline (Kaldi)
+  - End-to-end models (CTC, LAS, DeepSpeech)
+  - Transformer-based ASR (Conformer, wav2vec 2.0)
+  - **Whisper architecture deep dive** (encoder/decoder, special tokens, model sizes)
+  - Decoding strategies (greedy, beam search)
+  - Evaluation metrics (WER, CER, RTF)
+  
+- **[models.md](docs/concepts/models.md)** - Neural Networks & Optimization
+  - Neural network fundamentals (layers, activations, transformers)
+  - Encoder-decoder architecture (complete PyTorch implementations)
+  - Whisper model internals (74M parameter breakdown, vocabulary, tokenization)
+  - **Model quantization** (FP32→INT8, PTQ/QAT, CTranslate2)
+  - Inference optimization (ONNX, TensorRT, OpenVINO)
+  - Model compression (pruning, distillation, low-rank factorization)
+  - Hardware acceleration (CPU, GPU, edge devices)
+  
+- **[multithreading.md](docs/concepts/multithreading.md)** - Python Concurrency
+  - Concurrency fundamentals (I/O-bound vs CPU-bound)
+  - **Python GIL** (what it is, when released, bypassing strategies)
+  - Threading (locks, semaphores, events, producer-consumer)
+  - Multiprocessing (processes, IPC, batch transcription)
+  - Async/await (asyncio, WebSockets)
+  - **GUI threading** (PyQt QThread with real examples from this project)
+  - Real-time audio streaming (ring buffers, latency optimization)
+  - Profiling & debugging
+
+**All tutorials include:**
+- Mathematical foundations and formulas
+- Complete, runnable Python code examples
+- References to academic papers and tools
+- Production-ready patterns and best practices
 
 ## 🤝 Contributing
 
