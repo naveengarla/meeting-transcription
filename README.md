@@ -35,6 +35,9 @@ A Windows desktop application for real-time meeting transcription and Minutes of
 - ✅ **Real-time** - See transcription as you speak
 - ✅ **Good accuracy** - Google-powered
 - ✅ **Easy setup** - No model downloads
+- ❌ **Microphone only** - Cannot capture system audio/speakers
+- ❌ **Not for meetings** - Cannot transcribe other participants (Teams, Zoom)
+- ❌ **Dictation use case only** - For typing what you say, not recording meetings
 - ❌ Requires internet connection
 - ❌ Limited language support (primarily English)
 - ❌ Privacy concern (audio sent to Google)
