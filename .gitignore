@@ -35,14 +35,15 @@ ENV/
 # Environment variables
 .env
 
-# Recordings & Transcripts
-recordings/
-transcripts/
-*.wav
-*.mp3
-*.txt
-*.md
+# Recordings & Transcripts (keep structure, exclude content)
+recordings/*.wav
+recordings/*.mp3
+transcripts/*.txt
+transcripts/*.md
 !README.md
+!QUICKSTART.md
+!requirements.txt
+!docs/*.md
 
 # Models cache
 models/
