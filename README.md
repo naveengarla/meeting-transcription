@@ -73,9 +73,29 @@ A Windows desktop application for real-time meeting transcription and Minutes of
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Windows 10/11** (64-bit)
+- **Windows 10/11** (Build 17763 or later)
 - **Python 3.10+** ([Download here](https://www.python.org/downloads/))
+- **4GB RAM minimum** (8GB recommended)
+- **3GB free disk space**
 - **Chrome or Edge browser** (for Chrome Speech API option)
+
+### System Requirements Check
+
+**Before installation**, verify your system meets requirements:
+
+```powershell
+python check_system.py
+```
+
+This checks:
+- ✅ Windows version (Build 17763+)
+- ✅ Python version (3.10+)
+- ✅ CPU cores (2+ recommended)
+- ✅ Available RAM (4GB+ minimum)
+- ✅ Disk space (3GB+ required)
+- ✅ Audio input devices
+- ✅ Visual C++ Redistributable
+- ✅ Internet connectivity
 
 ### Installation
 
@@ -84,25 +104,89 @@ A Windows desktop application for real-time meeting transcription and Minutes of
    cd c:\Src2\speech2text
    ```
 
-2. **Run the setup script**
+2. **Run the enhanced setup script**
    ```powershell
    .\setup.ps1
    ```
    
    This will:
-   - Create a virtual environment
-   - Install all dependencies
-   - Create configuration files
+   - ✅ Verify Windows Build 17763+
+   - ✅ Check Python 3.10+ installed
+   - ✅ Verify disk space (3GB+)
+   - ✅ Detect Visual C++ Redistributable
+   - ✅ Create virtual environment
+   - ✅ Install all dependencies
+   - ✅ Validate dependencies (including DLL checks)
+   - ✅ Run comprehensive system check
+   - ✅ Create configuration files
 
 3. **Activate the virtual environment**
    ```powershell
    .\venv\Scripts\Activate.ps1
    ```
 
+### First-Time Configuration
+
+#### Easy Setup (Graphical UI)
+
+**Settings Dialog** - Configure everything via GUI:
+
+```powershell
+python settings_ui.py
+```
+
+Features:
+- 🎙️ **Audio device selection** - Auto-detect microphones and Stereo Mix
+- 🤖 **Model selection** - Choose from tiny/base/small/medium with size/quality info
+- 🌐 **Language configuration** - Select from 99+ languages
+- ⚙️ **Performance tuning** - Auto-detect optimal CPU threads
+- 📁 **Output folder** - Browse and select save location
+- 💾 **Saves to .env** - No manual file editing required
+
+#### Audio Device Setup (Interactive Helper)
+
+**Detect and configure audio devices:**
+
+```powershell
+python audio_setup_helper.py
+```
+
+This interactive wizard:
+- 🔍 Detects all input/output devices
+- ✅ Identifies Stereo Mix availability
+- 📋 Shows step-by-step Stereo Mix setup guide
+- 🔧 Recommends virtual audio cable alternatives (VB-Cable, Voicemeeter)
+- 🎵 Tests audio recording with amplitude analysis
+- 💾 Generates .env configuration automatically
+
+#### Model Download (Pre-download for Offline Use)
+
+**Download AI models before first use:**
+
+```powershell
+python download_models.py
+```
+
+Interactive menu shows:
+- 📊 Model sizes (75MB - 1.5GB)
+- ⚡ Speed/quality tradeoffs
+- ✅ Already downloaded models
+- 📥 Download progress with speed indicators
+
+Options:
+1. Base (142 MB) - **Recommended**
+2. Tiny (75 MB) - Very fast
+3. Small (466 MB) - Better quality
+4. Medium (1.5 GB) - Best quality
+5. All models (683 MB)
+6. Skip
+
+Models auto-download on first use if not pre-downloaded.
+
 4. **(Optional) Configure Azure Speech Service**
    
    If you want to use Azure transcription:
-   - Edit `.env` file
+   - Run `python settings_ui.py` OR edit `.env` file manually
    - Add your Azure credentials:
      ```
      AZURE_SPEECH_KEY=your_key_here
@@ -114,6 +198,116 @@ A Windows desktop application for real-time meeting transcription and Minutes of
    ```powershell
    python run.py
    ```
+
+## 🛠️ Production Features
+
+### System Validation & Diagnostics
+
+**check_system.py** - Pre-installation system validation
+- Checks Windows version, Python, CPU, RAM, disk space
+- Validates audio devices and VC++ Redistributable
+- Provides specific solutions for failed checks
+- Run before installation to catch issues early
+
+**check_dependencies.py** - Runtime dependency validation
+- Validates all Python packages
+- Checks for PortAudio DLL (sounddevice)
+- Detects Visual C++ Redistributable
+- Enumerates audio devices
+- Provides troubleshooting for missing DLLs
+
+**diagnostic_report.py** - Comprehensive troubleshooting report
+- Collects system info (OS, CPU, RAM, Python version)
+- Lists all audio devices
+- Shows installed packages
+- Scans model cache
+- Includes recent performance logs
+- Exports to JSON + formatted terminal display
+
+```powershell
+# Generate diagnostic report
+python diagnostic_report.py
+
+# Output: logs/diagnostic_report_YYYYMMDD_HHMMSS.json
+```
+
+### Enhanced Setup & Installation
+
+**setup.ps1** - Production-ready installer (143 lines, 9 validation steps)
+- ✅ Verifies Windows Build 17763+ (Version 1809+)
+- ✅ Checks admin privileges if needed
+- ✅ Validates Python 3.10+ installed
+- ✅ Ensures 3GB+ disk space available
+- ✅ Detects Visual C++ Redistributable
+- ✅ Creates virtual environment
+- ✅ Installs dependencies
+- ✅ Validates all dependencies with DLL checks
+- ✅ Runs comprehensive system check
+- Colored output with progress indicators [1/9] through [9/9]
+
+### Robust Error Handling
+
+**RobustTranscriptionEngine** - Automatic fallback on errors
+- Catches MemoryError and falls back to smaller models
+- Graceful degradation: large → medium → small → base → tiny
+- User-friendly error messages with specific solutions
+- Logging for diagnostics
+- Enable/disable auto-fallback in settings
+
+Example:
+```python
+from src.robust_transcription import create_robust_engine
+
+# Creates engine with automatic fallback
+engine = create_robust_engine()
+
+# If 'medium' model fails due to MemoryError, automatically tries 'small', then 'base', then 'tiny'
+segments = engine.transcribe('meeting.wav')
+```
+
+### Building Standalone Executable
+
+**PyInstaller packaging** - Create distributable .exe
+
+```powershell
+# Install PyInstaller
+pip install pyinstaller
+
+# Build executable (automated script)
+python build_executable.py
+```
+
+Features:
+- ✅ Single .exe file (or folder distribution)
+- ✅ Bundles Python runtime + all dependencies
+- ✅ Includes models/ directory (or downloads on first run)
+- ✅ No Python installation required on target machine
+- ✅ Automated build script with verification
+- ✅ Creates distribution package with README
+
+Output: `dist/MeetingTranscription.exe`
+
+**Manual build:**
+```powershell
+pyinstaller --clean --noconfirm meeting_transcription.spec
+```
+
+### Configuration Files
+
+**.env.example** - Template configuration file
+- Copy to `.env` and customize
+- All settings documented with examples
+- Recommended values provided
+- Auto-generated by settings UI
+
+```powershell
+# Copy template
+copy .env.example .env
+
+# Or use Settings UI
+python settings_ui.py
+```
+
 
 ## 📖 Usage Guide
 
