@@ -411,8 +411,10 @@ class ChromeSpeechEngine(TranscriptionEngine):
 class WhisperEngine(TranscriptionEngine):
     """OpenAI Whisper local transcription engine"""
     
-    def __init__(self, model_size: str = "base"):
+    def __init__(self, model_size: str = "base", language: str = "auto", task: str = "transcribe"):
         self.model_size = model_size
+        self.language = language if language != "auto" else None
+        self.task = task  # 'transcribe' or 'translate' (to English)
         self.model = None
         
     @property
@@ -455,13 +457,26 @@ class WhisperEngine(TranscriptionEngine):
                 audio_float = audio_float.mean(axis=1)
             
             # Transcribe
-            print("Transcribing with Whisper...")
-            result = self.model.transcribe(
-                audio_float,
-                language='en',
-                task='transcribe',
-                verbose=False
-            )
+            language_str = self.language if self.language else "auto-detect"
+            print(f"🎤 Transcribing with Whisper (language: {language_str}, task: {self.task})...")
+            print(f"   WhisperEngine.language = {self.language}")
+            
+            # Build transcription parameters
+            transcribe_params = {
+                'verbose': False,
+                'task': self.task
+            }
+            
+            # Add language if specified (not auto-detect)
+            if self.language:
+                transcribe_params['language'] = self.language
+                print(f"   Using language parameter: {self.language}")
+            
+            result = self.model.transcribe(audio_float, **transcribe_params)
+            
+            # Log detected language
+            detected_lang = result.get('language', 'unknown')
+            print(f"✓ Detected/Used language: {detected_lang}")
             
             # Convert to TranscriptSegment objects
             segments = []
@@ -580,7 +595,11 @@ class TranscriptionManager:
             self.engines['chrome'] = chrome_engine
         
         # Whisper
-        whisper_engine = WhisperEngine(model_size=config.WHISPER_MODEL)
+        whisper_engine = WhisperEngine(
+            model_size=config.WHISPER_MODEL,
+            language=config.WHISPER_LANGUAGE,
+            task=config.WHISPER_TASK
+        )
         if whisper_engine.is_available():
             self.engines['whisper'] = whisper_engine
         

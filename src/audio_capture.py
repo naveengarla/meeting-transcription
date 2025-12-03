@@ -57,30 +57,26 @@ class AudioCapture:
         try:
             devices = sd.query_devices()
             for idx, device in enumerate(devices):
+                device_name = device['name']
+                
                 # Check if device supports input
                 if device['max_input_channels'] > 0:
+                    # Check if this is a loopback device (Stereo Mix, What U Hear, etc.)
+                    is_loopback = any(keyword in device_name.lower() for keyword in 
+                                    ['stereo mix', 'wave out', 'what u hear', 'loopback', 'wave out mix'])
+                    
                     audio_dev = AudioDevice(
                         index=idx,
-                        name=device['name'],
+                        name=device_name,
                         channels=device['max_input_channels'],
                         sample_rate=device['default_samplerate'],
-                        is_loopback=False
+                        is_loopback=is_loopback
                     )
-                    input_devices.append(audio_dev)
-                
-                # Windows WASAPI loopback devices typically have "Stereo Mix" or similar in name
-                # or we can use hostapi to identify WASAPI devices
-                if 'Windows WASAPI' in str(device.get('hostapi', '')):
-                    if device['max_output_channels'] > 0:
-                        # Try to find loopback capability
-                        loopback_dev = AudioDevice(
-                            index=idx,
-                            name=device['name'] + " (Loopback)",
-                            channels=device['max_output_channels'],
-                            sample_rate=device['default_samplerate'],
-                            is_loopback=True
-                        )
-                        loopback_devices.append(loopback_dev)
+                    
+                    if is_loopback:
+                        loopback_devices.append(audio_dev)
+                    else:
+                        input_devices.append(audio_dev)
                         
         except Exception as e:
             print(f"Error listing devices: {e}")
@@ -191,37 +187,46 @@ class AudioCapture:
                     if self.on_audio_chunk:
                         self.on_audio_chunk('mic', indata.copy())
                 
+                # Use device's actual supported channels, not config value
+                mic_channels = min(mic_device.channels, self.channels)
                 self.mic_stream = sd.InputStream(
                     device=mic_device.index,
-                    channels=self.channels,
+                    channels=mic_channels,
                     samplerate=self.sample_rate,
                     callback=mic_callback,
                     dtype='int16'
                 )
                 self.mic_stream.start()
-                print(f"✓ Recording from microphone: {mic_device.name}")
+                print(f"✓ Recording from microphone: {mic_device.name} ({mic_channels} channel(s))")
             
             # Start speaker recording (loopback)
             if record_speaker and speaker_device:
-                def speaker_callback(indata, frames, time, status):
-                    if status:
-                        print(f"Speaker status: {status}")
-                    with self.lock:
-                        self.speaker_data.append(indata.copy())
-                    if self.on_audio_chunk:
-                        self.on_audio_chunk('speaker', indata.copy())
-                
-                # For loopback, we need to use input stream with loopback flag
-                # This is Windows-specific WASAPI feature
-                self.speaker_stream = sd.InputStream(
-                    device=speaker_device.index,
-                    channels=self.channels,
-                    samplerate=self.sample_rate,
-                    callback=speaker_callback,
-                    dtype='int16'
-                )
-                self.speaker_stream.start()
-                print(f"✓ Recording system audio: {speaker_device.name}")
+                try:
+                    def speaker_callback(indata, frames, time, status):
+                        if status:
+                            print(f"Speaker status: {status}")
+                        with self.lock:
+                            self.speaker_data.append(indata.copy())
+                        if self.on_audio_chunk:
+                            self.on_audio_chunk('speaker', indata.copy())
+                    
+                    # For loopback, we need to use input stream with loopback flag
+                    # This is Windows-specific WASAPI feature
+                    # Use device's actual supported channels, not config value
+                    speaker_channels = min(speaker_device.channels, self.channels)
+                    self.speaker_stream = sd.InputStream(
+                        device=speaker_device.index,
+                        channels=speaker_channels,
+                        samplerate=self.sample_rate,
+                        callback=speaker_callback,
+                        dtype='int16'
+                    )
+                    self.speaker_stream.start()
+                    print(f"✓ Recording system audio: {speaker_device.name} ({speaker_channels} channel(s))")
+                except Exception as speaker_error:
+                    print(f"⚠ Could not record system audio: {speaker_error}")
+                    print(f"  Continuing with microphone only. Enable 'Stereo Mix' in Windows Sound Settings.")
+                    self.speaker_stream = None
             
             return True
             

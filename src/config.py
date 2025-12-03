@@ -21,13 +21,15 @@ MODELS_DIR.mkdir(exist_ok=True)
 
 # Audio settings
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
-CHANNELS = int(os.getenv("CHANNELS", "1"))
+CHANNELS = int(os.getenv("CHANNELS", "2"))  # Preferred, but auto-detects device capability
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1024"))
 AUDIO_FORMAT = "int16"  # 16-bit PCM
 
 # Transcription settings
 TRANSCRIPTION_MODE = os.getenv("TRANSCRIPTION_MODE", "whisper")  # chrome, whisper, or azure
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")  # tiny, base, small, medium, large
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")  # tiny, base (recommended for English), small, medium, large
+WHISPER_LANGUAGE = os.getenv("WHISPER_LANGUAGE", "en")  # English only for optimal performance
+WHISPER_TASK = os.getenv("WHISPER_TASK", "transcribe")  # transcribe or translate
 
 # Preferred audio devices (empty string = use system default)
 PREFERRED_MICROPHONE = os.getenv("PREFERRED_MICROPHONE", "")

@@ -1,6 +1,7 @@
 # Core Dependencies
 PyQt6==6.6.1
 PyQt6-Qt6==6.6.1
+pygame==2.6.1  # For built-in audio player
 
 # Audio Capture & Processing
 sounddevice==0.4.6

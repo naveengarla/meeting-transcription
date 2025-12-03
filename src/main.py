@@ -7,14 +7,16 @@ import webbrowser
 import tempfile
 from pathlib import Path
 from datetime import datetime
+from queue import Queue
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTextEdit, QLabel, QComboBox, QGroupBox, 
     QFileDialog, QMessageBox, QCheckBox, QStatusBar, QProgressBar,
-    QListWidget, QDialog, QDialogButtonBox, QListWidgetItem
+    QListWidget, QDialog, QDialogButtonBox, QListWidgetItem, QSlider
 )
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer
 from PyQt6.QtGui import QFont, QIcon
+import pygame
 import numpy as np
 
 import config
@@ -79,6 +81,15 @@ class TranscriptionThread(QThread):
             self.error_occurred.emit(str(e))
 
 
+class TranscriptionQueueItem:
+    """Item in the transcription queue"""
+    def __init__(self, audio_data: np.ndarray, sample_rate: int, engine: str, filename: str):
+        self.audio_data = audio_data
+        self.sample_rate = sample_rate
+        self.engine = engine
+        self.filename = filename
+
+
 class MainWindow(QMainWindow):
     """Main application window"""
     
@@ -98,6 +109,12 @@ class MainWindow(QMainWindow):
         self.recording_thread = None
         self.transcription_thread = None
         self.chrome_browser_open = False
+        self.last_recording_file = None
+        
+        # Transcription queue
+        self.transcription_queue = Queue()
+        self.is_transcribing = False
+        self.queue_counter = 0
         
         # Setup UI
         self.init_ui()
@@ -140,14 +157,25 @@ class MainWindow(QMainWindow):
         self.speaker_combo = QComboBox()
         speaker_layout.addWidget(self.speaker_combo)
         self.record_speaker_check = QCheckBox("Record")
-        self.record_speaker_check.setChecked(False)
+        self.record_speaker_check.setChecked(True)  # Enable system audio recording by default
         speaker_layout.addWidget(self.record_speaker_check)
         audio_layout.addLayout(speaker_layout)
+        
+        # Buttons row for devices
+        device_buttons_layout = QHBoxLayout()
         
         # Refresh button
         refresh_btn = QPushButton("🔄 Refresh Devices")
         refresh_btn.clicked.connect(self.load_audio_devices)
-        audio_layout.addWidget(refresh_btn)
+        device_buttons_layout.addWidget(refresh_btn)
+        
+        # Sound Settings button
+        self.sound_settings_btn = QPushButton("🔊 Open Sound Settings")
+        self.sound_settings_btn.clicked.connect(self.open_sound_settings)
+        self.sound_settings_btn.setStyleSheet("background-color: #17a2b8; color: white;")
+        device_buttons_layout.addWidget(self.sound_settings_btn)
+        
+        audio_layout.addLayout(device_buttons_layout)
         
         audio_group.setLayout(audio_layout)
         main_layout.addWidget(audio_group)
@@ -239,14 +267,10 @@ class MainWindow(QMainWindow):
         # Recording Management Controls
         recording_mgmt_layout = QHBoxLayout()
         
-        self.view_recordings_btn = QPushButton("📁 View Recordings")
+        self.view_recordings_btn = QPushButton("📁 Recording Manager")
+        self.view_recordings_btn.setStyleSheet("background-color: #6c757d; color: white; font-size: 13px; padding: 10px;")
         self.view_recordings_btn.clicked.connect(self.view_recordings)
         recording_mgmt_layout.addWidget(self.view_recordings_btn)
-        
-        self.delete_recordings_btn = QPushButton("🗑 Delete Recordings")
-        self.delete_recordings_btn.setStyleSheet("background-color: #dc3545; color: white;")
-        self.delete_recordings_btn.clicked.connect(self.delete_recordings)
-        recording_mgmt_layout.addWidget(self.delete_recordings_btn)
         
         main_layout.addLayout(recording_mgmt_layout)
         
@@ -276,8 +300,10 @@ class MainWindow(QMainWindow):
             for dev in loopback_devices:
                 self.speaker_combo.addItem(dev.name, dev)
         else:
-            self.speaker_combo.addItem("No loopback device found", None)
+            self.speaker_combo.addItem("No system audio device available", None)
             self.record_speaker_check.setEnabled(False)
+            self.record_speaker_check.setChecked(False)
+            self.status_bar.showMessage("⚠ Enable 'Stereo Mix' in Windows Sound Settings to record system audio", 5000)
         
         # Try to select defaults
         default_mic, default_speaker = self.audio_capture.get_default_devices()
@@ -309,7 +335,24 @@ class MainWindow(QMainWindow):
         speaker_device = self.speaker_combo.currentData() if self.record_speaker_check.isChecked() else None
         
         if speaker_device is None and self.record_speaker_check.isChecked():
-            QMessageBox.warning(self, "Warning", "No system audio device available. Recording microphone only.")
+            reply = QMessageBox.warning(
+                self,
+                "System Audio Not Available",
+                "⚠️ System audio (Stereo Mix) is not available!\n\n"
+                "This means you will ONLY record YOUR voice through the microphone.\n"
+                "Meeting participants' voices will NOT be recorded.\n\n"
+                "To record meeting audio:\n"
+                "1. Click '🔊 Open Sound Settings' button\n"
+                "2. Enable 'Stereo Mix' device\n"
+                "3. Restart recording\n\n"
+                "Continue with microphone only?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.No:
+                return
+            
             self.record_speaker_check.setChecked(False)
         
         # Start recording in background thread
@@ -349,6 +392,9 @@ class MainWindow(QMainWindow):
             
             self.status_bar.showMessage(f"Recording stopped. Duration: {len(self.recorded_audio) / config.SAMPLE_RATE:.2f}s")
             self.transcribe_btn.setEnabled(True)
+            
+            # Store the last recording filename for playback
+            self.last_recording_file = config.RECORDINGS_DIR / f"recording_{timestamp}.wav"
         else:
             self.status_bar.showMessage("Recording stopped (no audio captured)")
         
@@ -376,12 +422,47 @@ class MainWindow(QMainWindow):
             )
             return
         
+        # Add to transcription queue
+        self.queue_counter += 1
+        queue_item = TranscriptionQueueItem(
+            audio_data=self.recorded_audio.copy(),
+            sample_rate=config.SAMPLE_RATE,
+            engine=engine_key,
+            filename=f"Recording #{self.queue_counter}"
+        )
+        self.transcription_queue.put(queue_item)
+        
+        queue_size = self.transcription_queue.qsize()
+        if queue_size > 1:
+            self.status_bar.showMessage(f"Added to queue. Position: {queue_size}")
+        
+        # Process queue if not already transcribing
+        if not self.is_transcribing:
+            self.process_transcription_queue()
+    
+    def process_transcription_queue(self):
+        """Process next item in transcription queue"""
+        if self.transcription_queue.empty():
+            self.is_transcribing = False
+            self.transcribe_btn.setEnabled(True)
+            self.status_bar.showMessage("All transcriptions complete")
+            return
+        
+        self.is_transcribing = True
+        queue_item = self.transcription_queue.get()
+        
+        remaining = self.transcription_queue.qsize()
+        status_msg = f"Transcribing {queue_item.filename}"
+        if remaining > 0:
+            status_msg += f" ({remaining} in queue)"
+        self.status_bar.showMessage(status_msg)
+        
         # Start transcription in background
         self.transcription_thread = TranscriptionThread(
             self.transcription_manager,
-            self.recorded_audio,
-            config.SAMPLE_RATE,
-            engine_key
+            queue_item.audio_data,
+            queue_item.sample_rate,
+            queue_item.engine
         )
         self.transcription_thread.transcription_complete.connect(self.on_transcription_complete)
         self.transcription_thread.progress_update.connect(self.on_progress_update)
@@ -393,21 +474,78 @@ class MainWindow(QMainWindow):
         
         self.transcription_thread.start()
     
+    def transcribe_from_file(self, item, dialog):
+        """Transcribe audio from a selected recording file"""
+        if not item:
+            QMessageBox.warning(self, "No Selection", "Please select a recording to transcribe.")
+            return
+        
+        recording_path = item.data(Qt.ItemDataRole.UserRole)
+        
+        try:
+            # Load audio file
+            import wave
+            import numpy as np
+            
+            with wave.open(str(recording_path), 'rb') as wav_file:
+                sample_rate = wav_file.getframerate()
+                n_frames = wav_file.getnframes()
+                audio_bytes = wav_file.readframes(n_frames)
+                audio_data = np.frombuffer(audio_bytes, dtype=np.int16)
+            
+            # Close the recording manager dialog
+            dialog.accept()
+            
+            # Get selected engine
+            engine_key = self.engine_combo.currentData()
+            
+            # Check if using Chrome engine
+            if engine_key == 'chrome':
+                QMessageBox.information(
+                    self, 
+                    "Chrome Web Speech", 
+                    "Chrome Web Speech API is designed for real-time transcription.\n\n"
+                    "For file-based transcription, please switch to Whisper or Azure engine."
+                )
+                return
+            
+            # Add to transcription queue
+            self.queue_counter += 1
+            queue_item = TranscriptionQueueItem(
+                audio_data=audio_data.copy(),
+                sample_rate=sample_rate,
+                engine=engine_key,
+                filename=recording_path.name
+            )
+            self.transcription_queue.put(queue_item)
+            
+            queue_size = self.transcription_queue.qsize()
+            if queue_size > 1:
+                self.status_bar.showMessage(f"Added '{recording_path.name}' to queue. Position: {queue_size}")
+            else:
+                self.status_bar.showMessage(f"Transcribing '{recording_path.name}'...")
+            
+            # Process queue if not already transcribing
+            if not self.is_transcribing:
+                self.process_transcription_queue()
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load audio file:\n{e}")
+    
     def on_transcription_complete(self, segments):
         """Handle transcription completion"""
-        self.current_segments = segments
+        self.current_segments.extend(segments)
         
-        # Display transcript
-        self.transcript_text.clear()
+        # Display transcript (append new segments)
         for seg in segments:
             self.transcript_text.append(f"[{seg.start_time:.1f}s] {seg.text}\n")
         
         self.progress_bar.setVisible(False)
-        self.transcribe_btn.setEnabled(True)
         self.save_txt_btn.setEnabled(True)
         self.save_md_btn.setEnabled(True)
         
-        self.status_bar.showMessage(f"Transcription complete: {len(segments)} segments")
+        # Process next item in queue
+        self.process_transcription_queue()
     
     def on_progress_update(self, message):
         """Handle progress update"""
@@ -418,7 +556,9 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, "Error", error_message)
         self.status_bar.showMessage(f"Error: {error_message}")
         self.progress_bar.setVisible(False)
-        self.transcribe_btn.setEnabled(True)
+        
+        # Process next item in queue even after error
+        self.process_transcription_queue()
     
     def open_chrome_speech(self):
         """Open Chrome Web Speech recognition page"""
@@ -519,7 +659,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Transcript cleared")
     
     def view_recordings(self):
-        """View all recorded audio files"""
+        """Open Recording Manager window"""
         recordings_dir = config.RECORDINGS_DIR
         
         if not recordings_dir.exists():
@@ -535,48 +675,88 @@ class MainWindow(QMainWindow):
         
         # Create dialog
         dialog = QDialog(self)
-        dialog.setWindowTitle("Recorded Files")
-        dialog.setMinimumWidth(500)
-        dialog.setMinimumHeight(400)
+        dialog.setWindowTitle("📁 Recording Manager")
+        dialog.setMinimumWidth(700)
+        dialog.setMinimumHeight(500)
         
         layout = QVBoxLayout(dialog)
         
-        # Info label
-        info_label = QLabel(f"Found {len(recordings)} recording(s) in:\n{recordings_dir}")
-        layout.addWidget(info_label)
+        # Header
+        header_layout = QHBoxLayout()
+        info_label = QLabel(f"📊 Total Recordings: {len(recordings)}")
+        info_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        header_layout.addWidget(info_label)
+        header_layout.addStretch()
+        
+        folder_label = QLabel(f"📂 {recordings_dir}")
+        folder_label.setStyleSheet("color: gray;")
+        header_layout.addWidget(folder_label)
+        layout.addLayout(header_layout)
         
         # List widget
         list_widget = QListWidget()
+        list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         
         for recording in sorted(recordings, reverse=True):
             size_mb = recording.stat().st_size / (1024 * 1024)
-            item_text = f"{recording.name} ({size_mb:.2f} MB)"
+            modified_time = datetime.fromtimestamp(recording.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            item_text = f"🎵 {recording.name}  |  {size_mb:.2f} MB  |  {modified_time}"
             item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, recording)
             list_widget.addItem(item)
         
+        # Double-click to play
+        list_widget.itemDoubleClicked.connect(lambda item: self.play_recording(item))
+        
         layout.addWidget(list_widget)
         
-        # Buttons
-        button_layout = QHBoxLayout()
+        # Action Buttons Row 1
+        button_layout1 = QHBoxLayout()
+        
+        play_btn = QPushButton("▶️ Play Selected")
+        play_btn.setStyleSheet("background-color: #28a745; color: white; font-size: 12px; padding: 8px;")
+        play_btn.clicked.connect(lambda: self.play_recording(list_widget.currentItem()))
+        button_layout1.addWidget(play_btn)
+        
+        transcribe_btn = QPushButton("📝 Transcribe Selected")
+        transcribe_btn.setStyleSheet("background-color: #007bff; color: white; font-size: 12px; padding: 8px; font-weight: bold;")
+        transcribe_btn.clicked.connect(lambda: self.transcribe_from_file(list_widget.currentItem(), dialog))
+        button_layout1.addWidget(transcribe_btn)
+        
+        delete_selected_btn = QPushButton("🗑 Delete Selected")
+        delete_selected_btn.setStyleSheet("background-color: #dc3545; color: white; font-size: 12px; padding: 8px;")
+        delete_selected_btn.clicked.connect(lambda: self.delete_selected_recording(list_widget, dialog))
+        button_layout1.addWidget(delete_selected_btn)
+        
+        refresh_btn = QPushButton("🔄 Refresh")
+        refresh_btn.setStyleSheet("background-color: #17a2b8; color: white; font-size: 12px; padding: 8px;")
+        refresh_btn.clicked.connect(lambda: [dialog.close(), self.view_recordings()])
+        button_layout1.addWidget(refresh_btn)
+        
+        layout.addLayout(button_layout1)
+        
+        # Action Buttons Row 2
+        button_layout2 = QHBoxLayout()
         
         open_folder_btn = QPushButton("📂 Open Folder")
         open_folder_btn.clicked.connect(lambda: self.open_folder(recordings_dir))
-        button_layout.addWidget(open_folder_btn)
+        button_layout2.addWidget(open_folder_btn)
         
-        play_btn = QPushButton("▶ Play Selected")
-        play_btn.clicked.connect(lambda: self.play_recording(list_widget.currentItem()))
-        button_layout.addWidget(play_btn)
+        delete_all_btn = QPushButton("🗑 Delete All Recordings")
+        delete_all_btn.setStyleSheet("background-color: #bd2130; color: white; font-weight: bold; font-size: 12px; padding: 8px;")
+        delete_all_btn.clicked.connect(lambda: [self.delete_all_recordings_from_manager(dialog), dialog.close()])
+        button_layout2.addWidget(delete_all_btn)
         
-        delete_selected_btn = QPushButton("🗑 Delete Selected")
-        delete_selected_btn.setStyleSheet("background-color: #dc3545; color: white;")
-        delete_selected_btn.clicked.connect(lambda: self.delete_selected_recording(list_widget, dialog))
-        button_layout.addWidget(delete_selected_btn)
+        layout.addLayout(button_layout2)
         
-        layout.addLayout(button_layout)
+        # Info text
+        info_text = QLabel("💡 Tip: Double-click to play | Select and click 'Transcribe' to transcribe old recordings")
+        info_text.setStyleSheet("color: gray; font-style: italic; margin-top: 5px;")
+        layout.addWidget(info_text)
         
         # Close button
         close_btn = QPushButton("Close")
+        close_btn.setStyleSheet("margin-top: 10px;")
         close_btn.clicked.connect(dialog.accept)
         layout.addWidget(close_btn)
         
@@ -673,24 +853,240 @@ class MainWindow(QMainWindow):
             subprocess.Popen(['xdg-open', folder_path])
     
     def play_recording(self, item):
-        """Play selected recording"""
+        """Play selected recording using built-in player"""
         if not item:
             return
         
         recording_path = item.data(Qt.ItemDataRole.UserRole)
+        self.open_audio_player(recording_path)
+
+    def open_audio_player(self, audio_path):
+        """Open built-in audio player dialog using pygame"""
+        player_dialog = QDialog(self)
+        player_dialog.setWindowTitle(f"🎵 Audio Player - {audio_path.name}")
+        player_dialog.setMinimumWidth(450)
+        player_dialog.setMinimumHeight(220)
         
+        layout = QVBoxLayout(player_dialog)
+        
+        # File info
+        file_size = audio_path.stat().st_size / (1024 * 1024)
+        info_label = QLabel(f"📂 {audio_path.name}\n📊 Size: {file_size:.2f} MB")
+        info_label.setStyleSheet("padding: 10px; background-color: #f0f0f0; border-radius: 5px; font-size: 11px;")
+        layout.addWidget(info_label)
+        
+        # Initialize pygame mixer
         try:
-            import os
-            if sys.platform == 'win32':
-                os.startfile(recording_path)
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            pygame.mixer.music.load(str(audio_path))
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load audio file:\n{e}")
+            player_dialog.reject()
+            return
+        
+        # Status label
+        status_label = QLabel("▶️ Playing...")
+        status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        status_label.setStyleSheet("font-size: 13px; font-weight: bold; color: #28a745; padding: 10px;")
+        layout.addWidget(status_label)
+        
+        # Control buttons
+        controls = QHBoxLayout()
+        
+        is_playing = {'state': False}
+        
+        play_pause_btn = QPushButton("▶️ Play")
+        play_pause_btn.setStyleSheet("background-color: #28a745; color: white; font-size: 14px; padding: 10px; min-width: 100px;")
+        
+        def toggle_play_pause():
+            if is_playing['state']:
+                pygame.mixer.music.pause()
+                is_playing['state'] = False
+                play_pause_btn.setText("▶️ Play")
+                play_pause_btn.setStyleSheet("background-color: #28a745; color: white; font-size: 14px; padding: 10px; min-width: 100px;")
+                status_label.setText("⏸ Paused")
+                status_label.setStyleSheet("font-size: 13px; font-weight: bold; color: #ffc107; padding: 10px;")
+            else:
+                if pygame.mixer.music.get_busy():
+                    pygame.mixer.music.unpause()
+                else:
+                    pygame.mixer.music.play()
+                is_playing['state'] = True
+                play_pause_btn.setText("⏸ Pause")
+                play_pause_btn.setStyleSheet("background-color: #ffc107; color: white; font-size: 14px; padding: 10px; min-width: 100px;")
+                status_label.setText("▶️ Playing...")
+                status_label.setStyleSheet("font-size: 13px; font-weight: bold; color: #28a745; padding: 10px;")
+        
+        play_pause_btn.clicked.connect(toggle_play_pause)
+        controls.addWidget(play_pause_btn)
+        
+        stop_btn = QPushButton("⏹ Stop")
+        stop_btn.setStyleSheet("background-color: #dc3545; color: white; font-size: 14px; padding: 10px; min-width: 100px;")
+        
+        def stop_playback():
+            pygame.mixer.music.stop()
+            is_playing['state'] = False
+            play_pause_btn.setText("▶️ Play")
+            play_pause_btn.setStyleSheet("background-color: #28a745; color: white; font-size: 14px; padding: 10px; min-width: 100px;")
+            status_label.setText("⏹ Stopped")
+            status_label.setStyleSheet("font-size: 13px; font-weight: bold; color: #dc3545; padding: 10px;")
+        
+        stop_btn.clicked.connect(stop_playback)
+        controls.addWidget(stop_btn)
+        
+        layout.addLayout(controls)
+        
+        # Volume control
+        volume_layout = QHBoxLayout()
+        volume_label = QLabel("🔊 Volume:")
+        volume_layout.addWidget(volume_label)
+        
+        volume_slider = QSlider(Qt.Orientation.Horizontal)
+        volume_slider.setRange(0, 100)
+        volume_slider.setValue(70)
+        volume_slider.valueChanged.connect(lambda v: pygame.mixer.music.set_volume(v / 100))
+        pygame.mixer.music.set_volume(0.7)
+        volume_layout.addWidget(volume_slider)
+        
+        volume_value_label = QLabel("70%")
+        volume_slider.valueChanged.connect(lambda v: volume_value_label.setText(f"{v}%"))
+        volume_layout.addWidget(volume_value_label)
+        
+        layout.addLayout(volume_layout)
+        
+        # Close button
+        close_btn = QPushButton("Close")
+        close_btn.setStyleSheet("margin-top: 10px; padding: 8px;")
+        close_btn.clicked.connect(lambda: [stop_playback(), player_dialog.accept()])
+        layout.addWidget(close_btn)
+        
+        # Auto-play
+        pygame.mixer.music.play()
+        is_playing['state'] = True
+        play_pause_btn.setText("⏸ Pause")
+        play_pause_btn.setStyleSheet("background-color: #ffc107; color: white; font-size: 14px; padding: 10px; min-width: 100px;")
+        
+        player_dialog.exec()
+        pygame.mixer.music.stop()
+    
+    def play_current_recording(self):
+        """Play the most recent recording (kept for backward compatibility)"""
+        if self.last_recording_file and self.last_recording_file.exists():
+            try:
+                self.open_audio_player(self.last_recording_file)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to play recording:\n{e}")
+        else:
+            QMessageBox.warning(self, "No Recording", "No recording available to play.")
+
+    def delete_all_recordings(self):
+        """Delete all recordings in the recordings folder"""
+        recordings = list(config.RECORDINGS_DIR.glob("*.wav"))
+        
+        if not recordings:
+            QMessageBox.information(self, "No Recordings", "No recordings to delete.")
+            return
+        
+        reply = QMessageBox.warning(
+            self,
+            "Delete All Recordings",
+            f"Are you sure you want to delete ALL {len(recordings)} recordings?\n\n"
+            "This action cannot be undone!",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            deleted_count = 0
+            failed_count = 0
+            
+            for recording in recordings:
+                try:
+                    recording.unlink()
+                    deleted_count += 1
+                except Exception as e:
+                    print(f"Failed to delete {recording.name}: {e}")
+                    failed_count += 1
+            
+            if failed_count > 0:
+                QMessageBox.warning(
+                    self,
+                    "Deletion Complete",
+                    f"Deleted {deleted_count} recordings.\n{failed_count} failed to delete."
+                )
             else:
                 QMessageBox.information(
                     self,
-                    "Play Recording",
-                    f"Please open the file manually:\n{recording_path}"
+                    "Deletion Complete",
+                    f"Successfully deleted all {deleted_count} recordings."
                 )
+            
+    def delete_all_recordings_from_manager(self, dialog):
+        """Delete all recordings from the Recording Manager window"""
+        recordings = list(config.RECORDINGS_DIR.glob("*.wav"))
+        
+        if not recordings:
+            QMessageBox.information(self, "No Recordings", "No recordings to delete.")
+            return
+        
+        reply = QMessageBox.warning(
+            self,
+            "Delete All Recordings",
+            f"Are you sure you want to delete ALL {len(recordings)} recordings?\n\n"
+            "This action cannot be undone!",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            deleted_count = 0
+            failed_count = 0
+            
+            for recording in recordings:
+                try:
+                    recording.unlink()
+                    deleted_count += 1
+                except Exception as e:
+                    print(f"Failed to delete {recording.name}: {e}")
+                    failed_count += 1
+            
+            if failed_count > 0:
+                QMessageBox.warning(
+                    self,
+                    "Deletion Complete",
+                    f"Deleted {deleted_count} recordings.\n{failed_count} failed to delete."
+                )
+            else:
+                QMessageBox.information(
+                    self,
+                    "Deletion Complete",
+                    f"Successfully deleted all {deleted_count} recordings."
+                )
+            
+            self.status_bar.showMessage(f"Deleted {deleted_count} recordings")
+
+    def open_sound_settings(self):
+        """Open Windows Sound Settings to enable Stereo Mix"""
+        import subprocess
+        try:
+            # Open classic Sound Control Panel (has Recording tab)
+            subprocess.Popen(['control', 'mmsys.cpl', 'sounds', ',1'])
+            
+            QMessageBox.information(
+                self,
+                "Enable Stereo Mix",
+                "To record system audio (what you hear):\n\n"
+                "1. In the 'Recording' tab that just opened\n"
+                "2. Right-click in empty space → 'Show Disabled Devices'\n"
+                "3. Find 'Stereo Mix' in the list\n"
+                "4. Right-click 'Stereo Mix' → 'Enable'\n"
+                "5. Click 'OK'\n"
+                "6. Click '🔄 Refresh Devices' in this app\n\n"
+                "Then you'll be able to record what you hear in your headphones!"
+            )
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to play recording:\n{e}")
+            QMessageBox.critical(self, "Error", f"Could not open Sound Settings:\n{e}")
 
 
 def main():
