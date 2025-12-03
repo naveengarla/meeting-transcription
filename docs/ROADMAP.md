@@ -2,28 +2,44 @@
 ## Meeting Transcription & MoM Generator
 
 ### Document Information
-- **Version**: 1.0
+- **Version**: 1.2 (v0.0.2 Released)
 - **Last Updated**: December 3, 2025
 - **Status**: Active Development
 
 ---
 
-## Current Status: Version 1.0 (Released)
+## Current Status: Version 0.0.2 (Released December 3, 2025)
 
-### ✅ Completed Features
+### ✅ Completed Features (v0.0.2)
 
 #### Core Functionality
 - [x] Audio capture from microphone (WASAPI)
-- [x] System audio capture via loopback devices
+- [x] System audio capture via loopback devices (Stereo Mix)
 - [x] Dual-channel recording (mic + system)
 - [x] WAV file export of recordings
 - [x] Multi-engine transcription architecture
-- [x] OpenAI Whisper integration (5 model sizes)
+- [x] **faster-whisper integration (CTranslate2-optimized, 6-7x real-time speed)**
 - [x] Chrome Web Speech API integration
 - [x] Azure Speech Service integration
 - [x] Timestamped transcript segments
 - [x] Plain text (.txt) export
 - [x] Markdown (.md) export
+- [x] **Multi-language support (99+ languages including Telugu, Kannada, Hindi, Tamil)**
+
+#### Performance & Monitoring (NEW in v0.0.2)
+- [x] **Performance logging system (psutil integration)**
+- [x] **Auto-logging to `logs/performance_YYYYMM.jsonl`**
+- [x] **Performance metrics analyzer (`analyze_performance.py`)**
+- [x] **CPU and memory usage tracking**
+- [x] **Speed multiplier calculations**
+- [x] **Language detection tracking**
+- [x] **Real-time factor analysis**
+
+#### Recording Management (NEW in v0.0.2)
+- [x] **Built-in audio player (pygame)**
+- [x] **Recording queue manager**
+- [x] **Batch transcription support**
+- [x] **"Record Now, Transcribe Later" workflow**
 
 #### User Interface
 - [x] PyQt6 desktop GUI
@@ -33,6 +49,7 @@
 - [x] Real-time transcript display
 - [x] Status bar with progress indicators
 - [x] Export buttons (TXT/MD)
+- [x] **Recording Manager with playback controls**
 
 #### Compliance & Management
 - [x] View all recordings dialog
@@ -44,26 +61,29 @@
 #### Configuration
 - [x] Environment-based configuration (.env)
 - [x] Preferred device selection
-- [x] Whisper model configuration
+- [x] Whisper model configuration (5 sizes)
 - [x] Transcription engine selection
+- [x] **Multi-core threading configuration (8 workers default)**
 
 #### Documentation
-- [x] README.md (user guide)
+- [x] README.md (user guide with v0.0.2 features)
 - [x] QUICKSTART.md (getting started)
-- [x] ARCHITECTURE.md (technical docs)
-- [x] REQUIREMENTS.md (specifications)
+- [x] ARCHITECTURE.md (technical docs with faster-whisper)
+- [x] REQUIREMENTS.md (specifications updated)
+- [x] **LANGUAGE_SUPPORT.md (99+ languages)**
+- [x] **MEETING_RECORDING_GUIDE.md (Stereo Mix setup)**
 - [x] Test scripts (audio, transcription, system)
 
 ---
 
-## Version 1.1 (Q1 2025) - UX Enhancements
+## Version 0.1.0 (Q1 2025) - UX Enhancements
 
 ### 🎯 Priority: High
 **Theme**: Improve user experience and feedback
 
 ### Features
 
-#### 1.1.1: Recording Timer Display
+#### 0.1.1: Recording Timer Display
 - **Status**: 📋 Planned
 - **Effort**: 2-4 hours
 - **Description**: Show elapsed time during recording
@@ -74,7 +94,7 @@
   - Prominent position near Stop button
   - Red color when recording
 
-#### 1.1.2: Audio Level Meter
+#### 0.1.2: Audio Level Meter
 - **Status**: 📋 Planned
 - **Effort**: 4-8 hours
 - **Description**: Visual audio level indicator
@@ -85,7 +105,7 @@
   - Green/yellow/red zones
   - Separate meters for mic and system audio
 
-#### 1.1.3: Pause/Resume Recording
+#### 0.1.3: Pause/Resume Recording
 - **Status**: 📋 Planned
 - **Effort**: 4-6 hours
 - **Description**: Pause recording without stopping
@@ -96,7 +116,7 @@
   - Visual indicator when paused
   - Timer continues/pauses appropriately
 
-#### 1.1.4: Keyboard Shortcuts
+#### 0.1.4: Keyboard Shortcuts
 - **Status**: 📋 Planned
 - **Effort**: 2-3 hours
 - **Description**: Hotkeys for common actions
@@ -111,7 +131,7 @@
   - QShortcut for each action
   - Display shortcuts in tooltips
 
-#### 1.1.5: Dark Mode
+#### 0.1.5: Dark Mode
 - **Status**: 📋 Planned
 - **Effort**: 3-5 hours
 - **Description**: Dark theme option
@@ -123,14 +143,14 @@
 
 ---
 
-## Version 1.2 (Q2 2025) - Real-Time Transcription
+## Version 0.2.0 (Q2 2025) - Real-Time Transcription
 
 ### 🎯 Priority: Very High
 **Theme**: Live transcription during recording
 
 ### Features
 
-#### 1.2.1: Real-Time Whisper Transcription
+#### 0.2.1: Real-Time Whisper Transcription
 - **Status**: 📋 Planned
 - **Effort**: 16-24 hours
 - **Description**: Transcribe audio while recording
@@ -146,7 +166,7 @@
   - Memory management (clear old chunks)
   - Segment boundary handling (avoid cut-off words)
 
-#### 1.2.2: Real-Time Transcript Display
+#### 0.2.2: Real-Time Transcript Display
 - **Status**: 📋 Planned
 - **Effort**: 4-6 hours
 - **Description**: Update transcript view during recording
@@ -157,7 +177,7 @@
   - Dim provisional text vs. finalized
   - Update timestamps in real-time
 
-#### 1.2.3: Real-Time Export
+#### 0.2.3: Real-Time Export
 - **Status**: 📋 Planned
 - **Effort**: 2-3 hours
 - **Description**: Save partial transcript while recording
@@ -170,14 +190,14 @@
 
 ---
 
-## Version 1.3 (Q2-Q3 2025) - Advanced Transcription
+## Version 0.3.0 (Q2-Q3 2025) - Advanced Transcription
 
 ### 🎯 Priority: High
 **Theme**: Improve transcription quality and features
 
 ### Features
 
-#### 1.3.1: Speaker Diarization
+#### 0.3.1: Speaker Diarization
 - **Status**: 📋 Planned
 - **Effort**: 16-32 hours
 - **Description**: Identify different speakers ("Speaker 1", "Speaker 2")
@@ -193,7 +213,7 @@
   [00:08] Speaker 2: Hi, thanks for joining
   ```
 
-#### 1.3.2: Custom Vocabulary
+#### 0.3.2: Custom Vocabulary
 - **Status**: 📋 Planned
 - **Effort**: 6-8 hours
 - **Description**: Add custom words/phrases for better recognition
@@ -204,7 +224,7 @@
   - Find/replace for common misspellings
   - UI to manage vocabulary list
 
-#### 1.3.3: Noise Reduction
+#### 0.3.3: Noise Reduction
 - **Status**: 📋 Planned
 - **Effort**: 8-12 hours
 - **Description**: Preprocess audio to reduce background noise
@@ -215,7 +235,7 @@
   - Toggle on/off in settings
   - Preview cleaned audio
 
-#### 1.3.4: Auto-Punctuation Enhancement
+#### 0.3.4: Auto-Punctuation Enhancement
 - **Status**: 📋 Planned
 - **Effort**: 4-6 hours
 - **Description**: Improve punctuation and capitalization
@@ -227,14 +247,14 @@
 
 ---
 
-## Version 1.4 (Q3 2025) - Collaboration & Editing
+## Version 0.4.0 (Q3 2025) - Collaboration & Editing
 
 ### 🎯 Priority: Medium
 **Theme**: Post-transcription workflow
 
 ### Features
 
-#### 1.4.1: Transcript Editor
+#### 0.4.1: Transcript Editor
 - **Status**: 📋 Planned
 - **Effort**: 12-16 hours
 - **Description**: Edit transcript text after generation
@@ -245,7 +265,7 @@
   - Diff view (original vs. edited)
   - Undo/redo support
 
-#### 1.4.2: Timestamp Markers
+#### 0.4.2: Timestamp Markers
 - **Status**: 📋 Planned
 - **Effort**: 4-6 hours
 - **Description**: Add manual markers during recording
@@ -256,7 +276,7 @@
   - Markers show in transcript: `[05:30] 🔖 ACTION: Follow up with client`
   - Export markers separately
 
-#### 1.4.3: Comments and Annotations
+#### 0.4.3: Comments and Annotations
 - **Status**: 📋 Planned
 - **Effort**: 8-12 hours
 - **Description**: Add notes to specific transcript segments
@@ -266,7 +286,7 @@
   - Comments stored in JSON alongside transcript
   - Export option to include/exclude comments
 
-#### 1.4.4: Search and Highlight
+#### 0.4.4: Search and Highlight
 - **Status**: 📋 Planned
 - **Effort**: 4-6 hours
 - **Description**: Search transcript for keywords

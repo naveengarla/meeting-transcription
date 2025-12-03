@@ -2,7 +2,7 @@
 ## Meeting Transcription & MoM Generator
 
 ### Document Information
-- **Version**: 1.0
+- **Version**: 1.2 (Updated for v0.0.2)
 - **Date**: December 3, 2025
 - **Project**: Meeting Transcription & MoM Generator
 - **Platform**: Windows Desktop Application
@@ -95,9 +95,10 @@ This document defines the functional and non-functional requirements for the Mee
   - Engine availability checked before use
   - Clear error messages for unavailable engines
 
-#### FR-TR-02: OpenAI Whisper Integration
+#### FR-TR-02: Whisper Integration (faster-whisper)
 - **Priority**: MUST HAVE
-- **Description**: System shall transcribe audio using Whisper AI
+- **Description**: System shall transcribe audio using faster-whisper (CTranslate2-optimized Whisper)
+- **Performance**: 6-7x real-time speed with base model on CPU
 - **Acceptance Criteria**:
   - Support model sizes: tiny, base, small, medium, large
   - Model selection configurable

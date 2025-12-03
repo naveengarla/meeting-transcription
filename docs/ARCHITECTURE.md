@@ -2,7 +2,7 @@
 ## Meeting Transcription & MoM Generator
 
 ### Document Version
-- **Version**: 1.0
+- **Version**: 1.2 (v0.0.2 Release)
 - **Last Updated**: December 3, 2025
 - **Status**: Production
 
@@ -15,7 +15,11 @@ The Meeting Transcription & MoM Generator is a Windows desktop application desig
 
 ### 1.2 Key Capabilities
 - **Dual Audio Capture**: Simultaneous microphone and system audio (loopback) recording
-- **Multi-Engine Transcription**: Support for Chrome Web Speech API, OpenAI Whisper, and Azure Speech Service
+- **Multi-Engine Transcription**: Support for Chrome Web Speech API, faster-whisper (CTranslate2-optimized), and Azure Speech Service
+- **High Performance**: 6-7x real-time transcription speed with base model on CPU
+- **Performance Monitoring**: Automatic logging of transcription metrics (speed, CPU, memory)
+- **Recording Management**: Built-in audio player, queue system, batch transcription
+- **Multi-Language Support**: 99+ languages including Telugu, Kannada, Hindi, Tamil, etc.
 - **Export Formats**: Plain text (.txt) and Markdown (.md)
 - **Compliance Management**: View and delete recordings for data privacy
 - **Offline Operation**: Local Whisper engine works without internet connectivity
@@ -39,9 +43,11 @@ graph TB
     
     subgraph Infrastructure["Infrastructure Layer"]
         SD["sounddevice<br/>(WASAPI)"]
-        WH["Whisper<br/>(PyTorch)"]
+        WH["faster-whisper<br/>(CTranslate2)"]
         AZ["Azure SDK"]
         WS["WebSocket Server"]
+        PS["psutil<br/>(Performance Monitoring)"]
+        PG["pygame<br/>(Audio Player)"]
     end
     
     GUI --> AC
@@ -183,8 +189,10 @@ classDiagram
     
     class WhisperEngine {
         +model_size: str
-        +model: Model
+        +model: WhisperModel
+        +num_workers: int
         +load_model()
+        +_log_performance()
     }
     
     class AzureSpeechEngine {
@@ -215,11 +223,15 @@ classDiagram
    - Generates HTML page for browser
    - Real-time callback support
 
-4. **WhisperEngine**: Local AI transcription
-   - Lazy model loading
+4. **WhisperEngine**: Local AI transcription (faster-whisper)
+   - Lazy model loading (CTranslate2-optimized)
    - Supports tiny/base/small/medium/large models
-   - CPU and GPU support
-   - Offline operation
+   - Multi-core CPU processing (8 workers default)
+   - int8 quantization for speed/memory efficiency
+   - VAD filtering for improved accuracy
+   - Performance logging with psutil
+   - Offline operation (no internet required)
+   - 6-7x real-time speed with base model
 
 5. **AzureSpeechEngine**: Cloud-based enterprise transcription
    - Requires API key and region
@@ -242,17 +254,19 @@ classDiagram
 
 #### **Dependencies**
 
-| Library                        | Purpose                 | Version   |
-| ------------------------------ | ----------------------- | --------- |
-| PyQt6                          | Desktop GUI framework   | 6.10.0    |
-| sounddevice                    | Audio I/O (WASAPI)      | 0.5.3     |
-| numpy                          | Audio data processing   | Latest    |
-| scipy                          | Audio filtering         | Latest    |
-| openai-whisper                 | Local AI transcription  | 20250625  |
-| torch                          | ML backend for Whisper  | 2.9.1+cpu |
-| azure-cognitiveservices-speech | Azure Speech SDK        | 1.47.0    |
-| websockets                     | Chrome Speech WebSocket | Latest    |
-| python-dotenv                  | Environment config      | Latest    |
+| Library                        | Purpose                      | Version |
+| ------------------------------ | ---------------------------- | ------- |
+| PyQt6                          | Desktop GUI framework        | 6.10.0  |
+| sounddevice                    | Audio I/O (WASAPI)           | 0.5.3   |
+| numpy                          | Audio data processing        | Latest  |
+| scipy                          | Audio filtering              | Latest  |
+| faster-whisper                 | Optimized AI transcription   | 1.2.1   |
+| CTranslate2                    | Inference engine for Whisper | 4.6.1   |
+| psutil                         | Performance monitoring       | 5.9.8   |
+| pygame                         | Audio player                 | 2.6.1   |
+| azure-cognitiveservices-speech | Azure Speech SDK             | 1.47.0  |
+| websockets                     | Chrome Speech WebSocket      | Latest  |
+| python-dotenv                  | Environment config           | Latest  |
 
 ---
 
@@ -389,10 +403,14 @@ sequenceDiagram
 
 ```
 speech2text/
-├── main.py                  # GUI application entry point
-├── audio_capture.py         # Audio recording module
-├── transcription.py         # Transcription engines
-├── config.py                # Configuration management
+├── src/
+│   ├── main.py              # GUI application entry point
+│   ├── audio_capture.py     # Audio recording module
+│   ├── transcription.py     # Transcription engines (faster-whisper)
+│   └── config.py            # Configuration management
+│
+├── run.py                   # Quick launch script
+├── analyze_performance.py   # Performance metrics analyzer
 ├── requirements.txt         # Python dependencies
 ├── setup.ps1                # Windows setup script
 ├── .env                     # User configuration (git-ignored)
@@ -407,10 +425,13 @@ speech2text/
 │   ├── transcript_YYYYMMDD_HHMMSS.txt
 │   └── transcript_YYYYMMDD_HHMMSS.md
 │
+├── logs/                    # Performance metrics (auto-generated)
+│   └── performance_YYYYMM.jsonl
+│
 ├── models/                  # Whisper model cache
-│   ├── tiny.pt
 │   ├── base.pt
-│   └── ...
+│   ├── tiny.pt
+│   └── models--Systran--faster-whisper-base/
 │
 ├── tests/                   # Test scripts
 │   ├── test_audio.py
@@ -420,6 +441,8 @@ speech2text/
 └── docs/                    # Documentation
     ├── ARCHITECTURE.md      # This file
     ├── REQUIREMENTS.md      # Requirements specification
+    ├── LANGUAGE_SUPPORT.md  # 99+ supported languages
+    ├── MEETING_RECORDING_GUIDE.md  # Stereo Mix setup
     └── ROADMAP.md           # Feature roadmap
 ```
 
@@ -451,15 +474,21 @@ speech2text/
 - **Bit Depth**: 16-bit (standard quality)
 - **Buffer Size**: Configurable via sounddevice
 
-### 8.2 Whisper Performance
-- **Model Selection**:
-  - `tiny`: ~1GB RAM, fastest (2-3x realtime)
-  - `base`: ~1.5GB RAM, good balance (recommended)
-  - `small`: ~2.5GB RAM, better accuracy
-  - `medium`: ~5GB RAM, high accuracy
-  - `large`: ~10GB RAM, best accuracy
-- **CPU vs GPU**: Auto-detects CUDA, falls back to CPU
-- **Model Caching**: Models loaded once, reused
+### 8.2 faster-whisper Performance (v0.0.2)
+- **Model Selection** (on Intel i7-1270P, 8 cores):
+  - `tiny`: ~200MB RAM, **10-12x real-time speed**
+  - `base`: ~300MB RAM, **6-7x real-time speed** (recommended)
+  - `small`: ~500MB RAM, **4-5x real-time speed**, better accuracy
+  - `medium`: ~1GB RAM, **2-3x real-time speed**, high accuracy
+  - `large`: ~2GB RAM, **1-2x real-time speed**, best accuracy
+- **Optimization**: CTranslate2 engine with int8 quantization
+- **CPU Multi-threading**: 8 workers (default), uses ~2 cores actively
+- **Memory Efficiency**: ~320MB peak usage for base model
+- **VAD Filtering**: Voice Activity Detection for improved accuracy
+- **Model Caching**: Models downloaded once, auto-cached locally
+- **Performance Logging**: Auto-logs metrics to `logs/performance_YYYYMM.jsonl`
+  - Tracks: speed_multiplier, CPU %, memory usage, language detection
+  - Analyze with: `python analyze_performance.py`
 
 ### 8.3 UI Responsiveness
 - Audio capture runs in `RecordingThread`

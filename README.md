@@ -2,7 +2,7 @@
 
 A Windows desktop application for real-time meeting transcription and Minutes of Meeting (MoM) generation. Captures both microphone and system audio, transcribes speech to text, and exports formatted transcripts.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-0.0.2-blue)
 ![Python](https://img.shields.io/badge/python-3.10+-green)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-orange)
@@ -11,28 +11,33 @@ A Windows desktop application for real-time meeting transcription and Minutes of
 
 ### Audio Capture
 - **Microphone Recording** - Capture your voice during meetings
-- **System Audio Loopback** - Record audio from Teams, Zoom, or any application
+- **System Audio Loopback (Stereo Mix)** - Record audio from Teams, Zoom, or any application
 - **Dual Channel Support** - Record both mic and system audio simultaneously
-- **WASAPI Backend** - High-quality Windows audio capture
+- **Auto-detection** - Automatically detects device capabilities (mono/stereo)
+- **Built-in Audio Player** - Play recordings directly in the app with volume control
 
 ### Transcription Engines (3 Options)
 
-#### 🌐 Chrome Web Speech API (Recommended for most users)
+#### 🚀 faster-whisper (Recommended - 6x faster!)
+- ✅ **Blazing fast** - 6-7x real-time speed (2.7 min audio in 25 seconds!)
+- ✅ **Offline** - Works without internet
+- ✅ **High quality** - Same OpenAI Whisper models, optimized engine
+- ✅ **Multi-threaded** - Uses 8 CPU cores efficiently
+- ✅ **Low memory** - int8 quantization (~300 MB vs 800+ MB)
+- ✅ **Private** - All processing local
+- ✅ **Free** - Open source
+- ✅ **99+ languages** - Including Telugu, Kannada, Hindi, Tamil, etc.
+- ✅ **Performance logging** - Track speed and resource usage
+- ❌ Requires CPU power (works great on i7-1270P and similar)
+
+#### 🌐 Chrome Web Speech API
 - ✅ **Free** - No API costs
 - ✅ **Real-time** - See transcription as you speak
 - ✅ **Good accuracy** - Google-powered
 - ✅ **Easy setup** - No model downloads
 - ❌ Requires internet connection
+- ❌ Limited language support (primarily English)
 - ❌ Privacy concern (audio sent to Google)
-
-#### 🔒 Whisper (Best for privacy)
-- ✅ **Offline** - Works without internet
-- ✅ **High quality** - OpenAI's SOTA model
-- ✅ **Private** - All processing local
-- ✅ **Free** - Open source
-- ❌ Requires GPU/CPU power
-- ❌ Large model downloads (1-3 GB)
-- ❌ Slower than real-time
 
 #### ☁️ Azure Speech Service (Enterprise)
 - ✅ **Highly accurate** - Enterprise-grade
@@ -41,6 +46,20 @@ A Windows desktop application for real-time meeting transcription and Minutes of
 - ❌ Requires Azure subscription
 - ❌ API costs apply
 - ❌ Requires internet
+
+### Recording Management
+- 📁 **Recording Manager** - Browse, play, and manage all recordings
+- 🎵 **Built-in Player** - Play recordings with play/pause/stop/volume controls
+- 📝 **Transcribe Later** - Record meetings now, transcribe when convenient
+- 🔄 **Queue System** - Batch transcribe multiple recordings
+- 🗑️ **Selective Deletion** - Delete individual or all recordings
+
+### Performance Monitoring
+- 📊 **Automatic Logging** - Performance metrics logged to `logs/performance_YYYYMM.jsonl`
+- ⚡ **Speed Tracking** - Real-time factor, speed multiplier (e.g., "6.69x real-time")
+- 💻 **Resource Monitoring** - CPU usage %, memory consumption
+- 📈 **Analysis Tool** - `analyze_performance.py` for detailed reports
+- 🕒 **Historical Data** - Monthly log files for trend analysis
 
 ### Export & Formatting
 - 📄 **Markdown Export** - Formatted with timestamps and sections
@@ -109,19 +128,44 @@ A Windows desktop application for real-time meeting transcription and Minutes of
 
 **Best for:** Quick meetings, real-time transcription, minimal setup
 
-#### Option 2: Record then Transcribe (Whisper/Azure)
+#### Option 2: Record then Transcribe (faster-whisper - Recommended!)
 
-1. **Select audio sources:**
+**For real-time meetings:**
+1. **Enable System Audio:**
+   - Click "🔊 Open Sound Settings" button
+   - Enable "Stereo Mix" (see troubleshooting guide below)
+   - Click "🔄 Refresh Devices"
+
+2. **Select audio sources:**
    - ✓ Microphone - Check to record your voice
-   - ✓ System Audio - Check to record Teams/Zoom audio
-2. **Select transcription engine** (Whisper or Azure)
-3. **Click "Start Recording"**
-4. **Conduct your meeting**
-5. **Click "Stop Recording"**
-6. **Click "Transcribe"** - wait for processing
-7. **Save transcript** as TXT or Markdown
+   - ✓ System Audio - Check to record Teams/Zoom participants
 
-**Best for:** Offline transcription, high accuracy, longer meetings
+3. **Select "Whisper (base, 8 cores)" engine**
+
+4. **Click "🎙 Start Recording"** BEFORE joining meeting
+
+5. **Conduct your meeting** (record everything)
+
+6. **Click "⏹ Stop Recording"** when done
+
+7. **Choose one:**
+   - **Transcribe now:** Click "📝 Transcribe" (wait ~4-5 min for 30-min meeting)
+   - **Transcribe later:** Click "📁 Recording Manager" → select recording → "📝 Transcribe Selected"
+
+**Best for:** Offline transcription, high accuracy, longer meetings, batch processing
+
+#### Option 3: Record Now, Transcribe Later (NEW!)
+
+**The productivity workflow:**
+1. **Morning:** Record 3 meetings back-to-back (just click record/stop)
+2. **Lunch:** Open Recording Manager, select all 3, queue them for transcription
+3. **Afternoon:** Review all transcripts, export to Markdown
+
+**Benefits:**
+- No waiting during meetings
+- Batch process multiple recordings
+- Transcribe when you have time
+- Queue fills automatically
 
 ### Exporting Transcripts
 
@@ -159,25 +203,41 @@ Meeting Transcript - 2025-12-03 14:30:00
 
 ```python
 SAMPLE_RATE=16000      # Audio sample rate (Hz)
-CHANNELS=1             # Mono (1) or Stereo (2)
+CHANNELS=2             # Preferred channels (auto-detects device capability)
 CHUNK_SIZE=1024        # Audio buffer size
+
+# Preferred audio devices (leave empty for system default)
+PREFERRED_MICROPHONE=Jabra Evolve2 30 SE
+PREFERRED_SPEAKER=Stereo Mix
 ```
 
 ### Transcription Settings
 
 ```python
-TRANSCRIPTION_MODE=chrome   # Default engine: chrome, whisper, or azure
-WHISPER_MODEL=base          # Whisper model size: tiny, base, small, medium, large
+TRANSCRIPTION_MODE=whisper     # Default engine: chrome, whisper, or azure
+WHISPER_MODEL=base             # Model size: tiny, base, small, medium, large
+WHISPER_LANGUAGE=en            # Language code or 'auto' for auto-detect
+WHISPER_TASK=transcribe        # 'transcribe' or 'translate' (to English)
 ```
 
-**Whisper Model Sizes:**
-| Model  | Size   | Speed   | Accuracy  | Use Case          |
-| ------ | ------ | ------- | --------- | ----------------- |
-| tiny   | 75 MB  | Fast    | Good      | Quick transcripts |
-| base   | 142 MB | Fast    | Better    | **Recommended**   |
-| small  | 466 MB | Medium  | Great     | High accuracy     |
-| medium | 1.5 GB | Slow    | Excellent | Best quality      |
-| large  | 2.9 GB | Slowest | Best      | Maximum accuracy  |
+**faster-whisper Model Performance (on i7-1270P, 8 cores):**
+| Model  | Size   | Speed       | Memory | Accuracy  | Use Case                  |
+| ------ | ------ | ----------- | ------ | --------- | ------------------------- |
+| tiny   | 75 MB  | ~10-12x RT  | ~200MB | Good      | Quick drafts, testing     |
+| base   | 142 MB | **6-7x RT** | ~300MB | Better    | **Recommended (default)** |
+| small  | 466 MB | ~4-5x RT    | ~500MB | Great     | High accuracy needed      |
+| medium | 1.5 GB | ~2-3x RT    | ~1GB   | Excellent | Best quality              |
+| large  | 2.9 GB | ~1-2x RT    | ~2GB   | Best      | Maximum accuracy          |
+
+**RT = Real-time** (e.g., 6x RT = 30-min meeting transcribed in 5 min)
+
+**Language Support:**
+- **99+ languages** supported including:
+  - Indian languages: Telugu (te), Kannada (kn), Hindi (hi), Tamil (ta), Malayalam (ml), etc.
+  - European: English (en), Spanish (es), French (fr), German (de), etc.
+  - Asian: Chinese (zh), Japanese (ja), Korean (ko), etc.
+- Set `WHISPER_LANGUAGE=auto` for automatic detection
+- See `docs/LANGUAGE_SUPPORT.md` for complete list and examples
 
 ## 🔧 Troubleshooting
 
@@ -191,6 +251,8 @@ WHISPER_MODEL=base          # Whisper model size: tiny, base, small, medium, lar
 3. Right-click empty area → **Show Disabled Devices**
 4. Right-click **Stereo Mix** → **Enable**
 5. Restart the app and refresh devices
+
+**Detailed Guide:** See `docs/MEETING_RECORDING_GUIDE.md` for step-by-step instructions with screenshots.
 
 **Solution 2: Use Virtual Audio Cable**
 1. Install [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) (free)
@@ -207,15 +269,37 @@ WHISPER_MODEL=base          # Whisper model size: tiny, base, small, medium, lar
 - ✓ Ensure website has HTTPS or is localhost
 - ✓ Try restarting the browser
 
-#### Whisper transcription is very slow
+#### Whisper transcription is slow
 
 **Solutions:**
-- Use smaller model: `WHISPER_MODEL=tiny` or `base`
-- Install CUDA for GPU acceleration:
-  ```powershell
-  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-  ```
-- Reduce audio quality: `SAMPLE_RATE=8000`
+- **Use faster-whisper (default):** Already 6-7x real-time speed with base model
+- **Try smaller model:** `WHISPER_MODEL=tiny` (10-12x speed) for quick drafts
+- **Check performance:** Run `python analyze_performance.py` to see actual metrics
+- **Verify CPU usage:** 190-215% CPU is normal and safe (uses ~2 cores efficiently)
+- **Model comparison:** 
+  - base model: 6-7x RT (30-min meeting → ~4.5 min transcription)
+  - small model: 4-5x RT (higher accuracy, slower)
+  - tiny model: 10-12x RT (fastest, lower accuracy)
+
+**Performance is normal if:** You see speed multipliers 6-7x for base, audio processes faster than real-time
+
+**Performance is slow if:** Transcription takes longer than audio duration - check logs with `analyze_performance.py`
+
+#### Incorrect language detection
+
+**Solutions:**
+- Set specific language: `WHISPER_LANGUAGE=te` (for Telugu), `en` (English), etc.
+- Use auto-detection: `WHISPER_LANGUAGE=auto` (works well for single-language audio)
+- Check detected language in logs: `logs/performance_YYYYMM.jsonl`
+- See all supported languages: `docs/LANGUAGE_SUPPORT.md`
+
+#### High memory usage
+
+**Solutions:**
+- Use smaller model: `tiny` (~200MB), `base` (~300MB), `small` (~500MB)
+- faster-whisper already uses int8 quantization (default, memory efficient)
+- Close other applications during transcription
+- Check actual usage: Run `python analyze_performance.py` for statistics
 
 #### "Module not found" errors
 
@@ -234,8 +318,27 @@ pip install -r requirements.txt
 - Use better microphone
 - Reduce background noise
 - Speak clearly and at moderate pace
-- Use larger Whisper model: `WHISPER_MODEL=medium`
+- Use larger Whisper model: `WHISPER_MODEL=small` or `medium`
+- Set correct language: `WHISPER_LANGUAGE=en` (or your language code)
+- Check language detection in logs
 - Switch to Azure Speech Service for best accuracy
+
+#### Performance monitoring
+
+**Check transcription metrics:**
+```powershell
+python analyze_performance.py
+```
+
+**What you'll see:**
+- Speed multiplier (6-7x is excellent for base model)
+- Total audio processed vs. time taken
+- Time saved calculations
+- CPU and memory usage statistics
+- Language detection breakdown
+- Recent transcription history
+
+**Log files location:** `logs/performance_YYYYMM.jsonl` (auto-created monthly)
 
 ### Debug Audio Devices
 
@@ -250,19 +353,32 @@ This will list all available devices and test recording.
 
 ```
 speech2text/
-├── main.py                  # Main GUI application
-├── audio_capture.py         # Audio recording module
-├── transcription.py         # Transcription engines
-├── config.py               # Configuration
-├── requirements.txt        # Python dependencies
-├── setup.ps1              # Setup script
-├── .env                   # User configuration (not in git)
-├── .env.example          # Configuration template
+├── src/
+│   ├── main.py              # Main GUI application
+│   ├── audio_capture.py     # Audio recording module
+│   ├── transcription.py     # Transcription engines (faster-whisper)
+│   └── config.py            # Configuration management
 │
-├── recordings/           # Saved audio files (auto-created)
+├── docs/
+│   ├── ARCHITECTURE.md              # System design
+│   ├── LANGUAGE_SUPPORT.md          # 99+ supported languages
+│   ├── MEETING_RECORDING_GUIDE.md   # Stereo Mix setup guide
+│   └── REQUIREMENTS.md              # Project requirements
+│
+├── logs/
+│   └── performance_YYYYMM.jsonl    # Auto-generated performance metrics
+│
+├── recordings/          # Saved audio files (auto-created)
 ├── transcripts/         # Exported transcripts (auto-created)
 ├── models/             # Whisper model cache (auto-created)
-└── venv/              # Virtual environment (auto-created)
+├── venv/              # Virtual environment (auto-created)
+│
+├── run.py                      # Quick launch script
+├── analyze_performance.py      # Performance metrics analyzer
+├── requirements.txt            # Python dependencies
+├── setup.ps1                   # Automated setup script
+├── .env                       # User configuration (not in git)
+└── .env.example              # Configuration template
 ```
 
 ## 🔌 Architecture
@@ -333,12 +449,15 @@ speech2text/
 
 1. **System audio capture requires Stereo Mix or virtual audio cable**
    - Not all systems have this enabled by default
+   - See `docs/MEETING_RECORDING_GUIDE.md` for setup instructions
    
 2. **Chrome Web Speech requires internet**
    - Not suitable for offline meetings
    
-3. **Whisper is slow on CPU-only systems**
-   - Consider GPU acceleration or smaller models
+3. **Whisper model downloads required on first use**
+   - Model sizes: 75MB (tiny) to 2.9GB (large)
+   - Models cached locally after first download
+   - faster-whisper downloads optimized models automatically
    
 4. **No speaker diarization yet**
    - Cannot automatically identify different speakers
@@ -348,17 +467,68 @@ speech2text/
    - WASAPI is Windows-specific
    - macOS/Linux support planned
 
+## 📊 Performance Benchmarks
+
+**Test Environment:**
+- CPU: Intel i7-1270P (12 cores, 16 threads)
+- Model: base (recommended)
+- Engine: faster-whisper 1.2.1 with int8 quantization
+- Configuration: 8 worker threads, VAD filtering enabled
+
+**Actual Results:**
+
+| Audio Length | Transcription Time | Speed Multiplier | CPU Usage | Memory  |
+| ------------ | ------------------ | ---------------- | --------- | ------- |
+| 13.6 seconds | 5.3 seconds        | 2.55x RT         | ~190%     | 310 MB  |
+| 164.7 sec    | 24.6 seconds       | **6.69x RT**     | ~215%     | 324 MB  |
+| 2.7 min      | ~25 seconds        | ~6.5x RT         | ~200%     | ~320 MB |
+
+**Projections:**
+
+| Meeting Length | Transcription Time (base model) | Time Saved      |
+| -------------- | ------------------------------- | --------------- |
+| 15 minutes     | ~2.3 minutes                    | 12.7 min (85%)  |
+| 30 minutes     | ~4.6 minutes                    | 25.4 min (85%)  |
+| 1 hour         | ~9.2 minutes                    | 50.8 min (85%)  |
+| 2 hours        | ~18.4 minutes                   | 101.6 min (85%) |
+
+**Performance Notes:**
+- **Speed increases with audio length** due to model warmup overhead
+- **CPU usage is safe:** ~200% = 2 cores actively used (out of 8 configured)
+- **Memory efficient:** ~320 MB peak usage regardless of audio length
+- **Linear scaling:** Longer audio processes proportionally faster
+- **Best practices:** 
+  - Use base model for optimal speed/accuracy balance (6-7x)
+  - Use tiny model for quick drafts (10-12x)
+  - Use small/medium for higher accuracy (4-5x / 2-3x)
+
+**Check your performance:**
+```powershell
+python analyze_performance.py
+```
+
+Shows detailed metrics, statistics, and recent transcription history from `logs/performance_YYYYMM.jsonl`.
+
 ## 🗺️ Roadmap
 
 ### Phase 2 (Future Enhancements)
 - [ ] Speaker diarization (identify who's speaking)
 - [ ] Real-time transcription for Whisper
-- [ ] Multi-language support
+- [ ] Multi-language support enhancement (already supports 99+ languages)
 - [ ] Keyword extraction and summarization
 - [ ] Integration with calendar apps
-- [ ] Audio playback with synchronized transcript
+- [ ] Audio playback with synchronized transcript (basic player already included)
 - [ ] Export to PDF, DOCX
 - [ ] Custom vocabulary/terminology
+- [ ] GPU acceleration detection and auto-configuration
+
+### Completed ✅
+- [x] faster-whisper integration (v0.0.2)
+- [x] Performance monitoring and logging (v0.0.2)
+- [x] Built-in audio player (v0.0.2)
+- [x] Recording queue manager (v0.0.2)
+- [x] Batch transcription support (v0.0.2)
+- [x] Stereo Mix support for meeting recording (v0.0.2)
 
 ## 📄 License
 
@@ -380,11 +550,14 @@ Contributions welcome! Please:
 ## 🙏 Credits
 
 Built with:
-- [OpenAI Whisper](https://github.com/openai/whisper) - Local transcription
-- [PyQt6](https://www.riverbankcomputing.com/software/pyqt/) - Desktop GUI
-- [sounddevice](https://python-sounddevice.readthedocs.io/) - Audio capture
-- [Azure Speech SDK](https://docs.microsoft.com/azure/cognitive-services/speech-service/) - Cloud transcription
-- [Chrome Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API) - Browser-based transcription
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) - Optimized Whisper transcription (CTranslate2)
+- [OpenAI Whisper](https://github.com/openai/whisper) - Original Whisper models
+- [PyQt6](https://www.riverbankcomputing.com/software/pyqt/) - Desktop GUI framework
+- [sounddevice](https://python-sounddevice.readthedocs.io/) - Audio capture (WASAPI)
+- [pygame](https://www.pygame.org/) - Built-in audio player
+- [psutil](https://github.com/giampaolo/psutil) - Performance monitoring
+- [Azure Speech SDK](https://docs.microsoft.com/azure/cognitive-services/speech-service/) - Cloud transcription (optional)
+- [Chrome Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API) - Browser-based transcription (optional)
 
 ---
 
